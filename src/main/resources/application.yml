@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: restaurant-management
+
+  # ===========================
+  # Datasource — PostgreSQL
+  # ===========================
+  datasource:
+    url: jdbc:postgresql://localhost:5432/restaurant_db
+    username: restaurant_user
+    password: restaurant_pass
+    driver-class-name: org.postgresql.Driver
+
+  # ===========================
+  # JPA / Hibernate
+  # ===========================
+  jpa:
+    hibernate:
+      ddl-auto: validate          # Flyway gerencia o schema; Hibernate apenas valida
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: public
+
+  # ===========================
+  # Flyway — Migrations
+  # ===========================
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # ===========================
+  # ProblemDetail (RFC 7807)
+  # ===========================
+  mvc:
+    problemdetails:
+      enabled: true
+
+# ===========================
+# Servidor
+# ===========================
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# ===========================
+# SpringDoc / Swagger UI
+# ===========================
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  default-produces-media-type: application/json
+
+---
+# ===========================
+# Perfil Docker
+# ===========================
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
