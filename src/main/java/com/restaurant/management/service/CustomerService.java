@@ -84,7 +84,9 @@ public class CustomerService extends BaseUserService<Customer> {
         }
 
         log.info("Dados do cliente {} atualizados", id);
-        return toResponse(repository.save(customer));
+        // saveAndFlush: o @UpdateTimestamp só é aplicado no flush. Com save(), o DTO seria
+        // montado antes disso e devolveria o lastModifiedAt do cadastro, não o da alteração.
+        return toResponse(repository.saveAndFlush(customer));
     }
 
     /** A senha nunca é devolvida na resposta. */

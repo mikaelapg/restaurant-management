@@ -202,7 +202,7 @@ class CustomerServiceTest {
             );
 
             when(customerRepository.findById(1L)).thenReturn(Optional.of(sampleCustomer));
-            when(customerRepository.save(any(Customer.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(customerRepository.saveAndFlush(any(Customer.class))).thenAnswer(inv -> inv.getArgument(0));
 
             CustomerResponse response = customerService.update(1L, request);
 

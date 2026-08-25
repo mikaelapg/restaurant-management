@@ -136,7 +136,7 @@ class RestaurantOwnerServiceTest {
             );
 
             when(restaurantOwnerRepository.findById(1L)).thenReturn(Optional.of(sampleOwner));
-            when(restaurantOwnerRepository.save(any(RestaurantOwner.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(restaurantOwnerRepository.saveAndFlush(any(RestaurantOwner.class))).thenAnswer(inv -> inv.getArgument(0));
 
             RestaurantOwnerResponse response = ownerService.update(1L, request);
 
