@@ -91,7 +91,7 @@ class CustomerServiceTest {
             );
 
             when(userRepository.findByEmail("maria@email.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLogin("maria.silva")).thenReturn(Optional.empty());
+            when(userRepository.findByLoginIgnoreCase("maria.silva")).thenReturn(Optional.empty());
             when(passwordEncoder.encode("Senha@123")).thenReturn("$2a$10$encodedPassword");
             when(customerRepository.save(any(Customer.class))).thenReturn(sampleCustomer);
 
@@ -130,7 +130,7 @@ class CustomerServiceTest {
             );
 
             when(userRepository.findByEmail("novo@email.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLogin("maria.silva")).thenReturn(Optional.of(sampleCustomer));
+            when(userRepository.findByLoginIgnoreCase("maria.silva")).thenReturn(Optional.of(sampleCustomer));
 
             assertThatThrownBy(() -> customerService.create(request))
                     .isInstanceOf(LoginAlreadyExistsException.class)

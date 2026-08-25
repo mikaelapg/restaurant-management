@@ -16,7 +16,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
 
-    Optional<User> findByLogin(String login);
+    /**
+     * Busca pelo login ignorando maiúsculas e minúsculas.
+     * O login é tratado como identificador único independente da caixa, do mesmo modo que o e-mail.
+     */
+    Optional<User> findByLoginIgnoreCase(String login);
 
     /** Busca por trecho do nome, ignorando maiúsculas e minúsculas. */
     List<User> findByNameContainingIgnoreCase(String name);

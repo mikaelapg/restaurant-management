@@ -53,7 +53,7 @@ class AuthServiceTest {
                     .build();
             user.setId(1L);
 
-            when(userRepository.findByLogin("maria.silva")).thenReturn(Optional.of(user));
+            when(userRepository.findByLoginIgnoreCase("maria.silva")).thenReturn(Optional.of(user));
             when(passwordEncoder.matches("Senha@123", "$2a$10$hashedPassword")).thenReturn(true);
 
             // Act
@@ -68,7 +68,7 @@ class AuthServiceTest {
             assertThat(response.login()).isEqualTo("maria.silva");
             assertThat(response.message()).isEqualTo("Login realizado com sucesso");
 
-            verify(userRepository).findByLogin("maria.silva");
+            verify(userRepository).findByLoginIgnoreCase("maria.silva");
             verify(passwordEncoder).matches("Senha@123", "$2a$10$hashedPassword");
         }
 
@@ -77,7 +77,7 @@ class AuthServiceTest {
         void shouldThrowInvalidCredentialsException_WhenLoginDoesNotExist() {
             // Arrange
             LoginRequest request = new LoginRequest("usuario.inexistente", "Senha@123");
-            when(userRepository.findByLogin("usuario.inexistente")).thenReturn(Optional.empty());
+            when(userRepository.findByLoginIgnoreCase("usuario.inexistente")).thenReturn(Optional.empty());
 
             // Act & Assert
             assertThatThrownBy(() -> authService.login(request))
@@ -96,7 +96,7 @@ class AuthServiceTest {
                     .password("$2a$10$hashedPassword")
                     .build();
 
-            when(userRepository.findByLogin("maria.silva")).thenReturn(Optional.of(user));
+            when(userRepository.findByLoginIgnoreCase("maria.silva")).thenReturn(Optional.of(user));
             when(passwordEncoder.matches("SenhaErrada", "$2a$10$hashedPassword")).thenReturn(false);
 
             // Act & Assert

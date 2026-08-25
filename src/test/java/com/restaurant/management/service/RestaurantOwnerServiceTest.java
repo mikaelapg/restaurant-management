@@ -90,7 +90,7 @@ class RestaurantOwnerServiceTest {
             );
 
             when(userRepository.findByEmail("carlos@bistro.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLogin("carlos.eduardo")).thenReturn(Optional.empty());
+            when(userRepository.findByLoginIgnoreCase("carlos.eduardo")).thenReturn(Optional.empty());
             when(passwordEncoder.encode("Senha@123")).thenReturn("$2a$10$encodedPassword");
             when(restaurantOwnerRepository.save(any(RestaurantOwner.class))).thenReturn(sampleOwner);
 
@@ -113,7 +113,7 @@ class RestaurantOwnerServiceTest {
             );
 
             when(userRepository.findByEmail("novo@bistro.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLogin("carlos.eduardo")).thenReturn(Optional.of(sampleOwner));
+            when(userRepository.findByLoginIgnoreCase("carlos.eduardo")).thenReturn(Optional.of(sampleOwner));
 
             assertThatThrownBy(() -> ownerService.create(request))
                     .isInstanceOf(LoginAlreadyExistsException.class)

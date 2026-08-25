@@ -79,9 +79,9 @@ public abstract class BaseUserService<T extends User> {
                 });
     }
 
-    /** Mesma ideia da checagem de e-mail, aplicada ao login. */
+    /** Mesma ideia da checagem de e-mail, aplicada ao login — também ignorando a caixa. */
     protected void ensureLoginIsAvailable(String login, Long currentUserId) {
-        userRepository.findByLogin(login)
+        userRepository.findByLoginIgnoreCase(login)
                 .filter(other -> !other.getId().equals(currentUserId))
                 .ifPresent(other -> {
                     throw new LoginAlreadyExistsException(login);

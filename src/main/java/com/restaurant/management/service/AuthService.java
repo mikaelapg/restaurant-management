@@ -37,7 +37,7 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         log.info("Tentativa de login para o usuário: {}", request.login());
 
-        User user = userRepository.findByLogin(request.login())
+        User user = userRepository.findByLoginIgnoreCase(request.login())
                 .orElseThrow(InvalidCredentialsException::new);
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
