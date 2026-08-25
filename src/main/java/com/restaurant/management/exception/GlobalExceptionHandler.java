@@ -1,6 +1,8 @@
 package com.restaurant.management.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -20,9 +22,20 @@ import java.util.Map;
 
 /**
  * Tratamento global de exceções com retorno padronizado no formato RFC 7807 (ProblemDetail).
+ * <p>
+ * A precedência máxima é necessária porque {@code spring.mvc.problemdetails.enabled} registra o
+ * {@code ProblemDetailsExceptionHandler} do próprio Spring com ordem 0. Sem o {@code @Order}, este
+ * advice ficaria em {@code LOWEST_PRECEDENCE} e o handler nativo responderia primeiro às exceções
+ * padrão do MVC (validação, JSON malformado, tipo de parâmetro e método não suportado), devolvendo
+ * {@code "type": "about:blank"} e títulos em inglês no lugar dos definidos aqui.
+ * <p>
+ * O tratamento genérico de {@code Exception} fica em {@link UnhandledExceptionHandler}, com a menor
+ * precedência: se estivesse nesta classe, capturaria tudo antes do Spring e transformaria em 500
+ * respostas que o handler nativo trata corretamente (415, 406, parâmetro obrigatório ausente).
  */
 @Slf4j
 @RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class GlobalExceptionHandler {
 
     // ===========================
@@ -187,23 +200,6 @@ public class GlobalExceptionHandler {
         );
         problem.setTitle("Senha Inválida");
         problem.setType(URI.create("https://restaurant-api.com/errors/invalid-password"));
-        problem.setProperty("timestamp", Instant.now());
-        return problem;
-    }
-
-    // ===========================
-    // 500 Internal Server Error
-    // ===========================
-
-    @ExceptionHandler(Exception.class)
-    public ProblemDetail handleGenericException(Exception ex) {
-        log.error("Erro interno não tratado:", ex);
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "Ocorreu um erro interno. Por favor, contate o suporte."
-        );
-        problem.setTitle("Erro Interno do Servidor");
-        problem.setType(URI.create("https://restaurant-api.com/errors/internal-error"));
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }

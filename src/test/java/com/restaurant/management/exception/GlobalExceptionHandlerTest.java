@@ -127,15 +127,4 @@ class GlobalExceptionHandlerTest {
         assertThat(problem.getStatus()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED.value());
         assertThat(problem.getTitle()).isEqualTo("Método Não Permitido");
     }
-
-    @Test
-    @DisplayName("Deve retornar 500 Internal Server Error para exceções genéricas inesperadas")
-    void shouldHandleGenericException() {
-        NullPointerException ex = new NullPointerException("Erro inesperado");
-
-        ProblemDetail problem = handler.handleGenericException(ex);
-
-        assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
-        assertThat(problem.getTitle()).isEqualTo("Erro Interno do Servidor");
-    }
 }
