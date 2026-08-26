@@ -175,6 +175,30 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(CpfAlreadyExistsException.class)
+    public ProblemDetail handleCpfAlreadyExists(CpfAlreadyExistsException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                ex.getMessage()
+        );
+        problem.setTitle("CPF Já Cadastrado");
+        problem.setType(URI.create("https://restaurant-api.com/errors/cpf-conflict"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(CnpjAlreadyExistsException.class)
+    public ProblemDetail handleCnpjAlreadyExists(CnpjAlreadyExistsException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                ex.getMessage()
+        );
+        problem.setTitle("CNPJ Já Cadastrado");
+        problem.setType(URI.create("https://restaurant-api.com/errors/cnpj-conflict"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         log.warn("Violação de integridade de dados no banco: {}", ex.getMessage());

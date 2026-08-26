@@ -10,6 +10,7 @@ import com.restaurant.management.dto.request.ChangePasswordRequest;
 import com.restaurant.management.dto.request.CreateCustomerRequest;
 import com.restaurant.management.dto.request.UpdateCustomerRequest;
 import com.restaurant.management.dto.response.CustomerResponse;
+import com.restaurant.management.exception.CpfAlreadyExistsException;
 import com.restaurant.management.exception.EmailAlreadyExistsException;
 import com.restaurant.management.exception.InvalidPasswordException;
 import com.restaurant.management.exception.LoginAlreadyExistsException;
@@ -137,6 +138,43 @@ class CustomerServiceTest {
                     .hasMessageContaining("maria.silva");
 
             verify(customerRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve lançar CpfAlreadyExistsException quando CPF já estiver em uso")
+        void shouldThrowCpfAlreadyExistsException_WhenCpfIsDuplicate() {
+            CreateCustomerRequest request = new CreateCustomerRequest(
+                    "Maria Silva", "novo@email.com", "novo.login", "Senha@123",
+                    null, "123.456.789-00", LocalDate.of(1995, 5, 20)
+            );
+
+            when(userRepository.findByEmail("novo@email.com")).thenReturn(Optional.empty());
+            when(userRepository.findByLoginIgnoreCase("novo.login")).thenReturn(Optional.empty());
+            when(customerRepository.findByCpf("123.456.789-00")).thenReturn(Optional.of(sampleCustomer));
+
+            assertThatThrownBy(() -> customerService.create(request))
+                    .isInstanceOf(CpfAlreadyExistsException.class)
+                    .hasMessageContaining("123.456.789-00");
+
+            verify(customerRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Não deve checar duplicidade de CPF quando o campo vier ausente")
+        void shouldSkipCpfCheck_WhenCpfIsNull() {
+            CreateCustomerRequest request = new CreateCustomerRequest(
+                    "Maria Silva", "maria@email.com", "maria.silva", "Senha@123",
+                    null, null, LocalDate.of(1995, 5, 20)
+            );
+
+            when(userRepository.findByEmail("maria@email.com")).thenReturn(Optional.empty());
+            when(userRepository.findByLoginIgnoreCase("maria.silva")).thenReturn(Optional.empty());
+            when(passwordEncoder.encode("Senha@123")).thenReturn("$2a$10$encodedPassword");
+            when(customerRepository.save(any(Customer.class))).thenReturn(sampleCustomer);
+
+            customerService.create(request);
+
+            verify(customerRepository, never()).findByCpf(any());
         }
     }
 

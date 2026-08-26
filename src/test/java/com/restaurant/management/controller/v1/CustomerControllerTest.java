@@ -113,6 +113,19 @@ class CustomerControllerTest {
     }
 
     @Test
+    @DisplayName("POST com CPF fora do formato devolve 400 apontando o campo")
+    void shouldReturn400WhenCpfFormatIsInvalid() throws Exception {
+        String payload = """
+                {"name": "Maria Silva", "email": "maria@email.com", "login": "maria.silva",
+                 "password": "Senha@123", "cpf": "abc", "dateOfBirth": "1995-05-20"}""";
+
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Erro de Validação"))
+                .andExpect(jsonPath("$.fieldErrors.cpf").exists());
+    }
+
+    @Test
     @DisplayName("POST com e-mail repetido devolve 409 no formato ProblemDetail")
     void shouldReturn409WhenEmailIsTaken() throws Exception {
         when(customerService.create(any(CreateCustomerRequest.class)))

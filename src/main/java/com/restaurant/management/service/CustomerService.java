@@ -6,6 +6,7 @@ import com.restaurant.management.domain.repository.UserRepository;
 import com.restaurant.management.dto.request.CreateCustomerRequest;
 import com.restaurant.management.dto.request.UpdateCustomerRequest;
 import com.restaurant.management.dto.response.CustomerResponse;
+import com.restaurant.management.exception.CpfAlreadyExistsException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,16 +22,41 @@ import java.util.List;
 @Service
 public class CustomerService extends BaseUserService<Customer> {
 
+    /** Mesma instância de {@code repository}, na forma concreta, para as consultas por CPF. */
+    private final CustomerRepository customerRepository;
+
     public CustomerService(CustomerRepository customerRepository,
                            UserRepository userRepository,
                            BCryptPasswordEncoder passwordEncoder) {
         super(customerRepository, userRepository, passwordEncoder);
+        this.customerRepository = customerRepository;
+    }
+
+    /**
+     * Garante que o CPF não pertença a outro cliente, recusando a duplicidade com uma mensagem
+     * que aponta o campo — em vez de deixar a constraint do banco cair no tratamento genérico.
+     * <p>
+     * CPF ausente não é checado: o campo é opcional e o banco aceita vários registros sem ele.
+     *
+     * @param currentUserId id do próprio cliente em uma atualização,
+     *                      ou {@code null} quando for um cadastro novo
+     */
+    private void ensureCpfIsAvailable(String cpf, Long currentUserId) {
+        if (cpf == null || cpf.isBlank()) {
+            return;
+        }
+        customerRepository.findByCpf(cpf)
+                .filter(other -> !other.getId().equals(currentUserId))
+                .ifPresent(other -> {
+                    throw new CpfAlreadyExistsException(cpf);
+                });
     }
 
     @Transactional
     public CustomerResponse create(CreateCustomerRequest request) {
         ensureEmailIsAvailable(request.email(), null);
         ensureLoginIsAvailable(request.login(), null);
+        ensureCpfIsAvailable(request.cpf(), null);
 
         Customer customer = Customer.builder()
                 .name(request.name())
@@ -73,6 +99,7 @@ public class CustomerService extends BaseUserService<Customer> {
 
         ensureEmailIsAvailable(request.email(), id);
         ensureLoginIsAvailable(request.login(), id);
+        ensureCpfIsAvailable(request.cpf(), id);
 
         customer.setName(request.name());
         customer.setEmail(request.email().toLowerCase());

@@ -6,6 +6,7 @@ import com.restaurant.management.domain.repository.UserRepository;
 import com.restaurant.management.dto.request.CreateRestaurantOwnerRequest;
 import com.restaurant.management.dto.request.UpdateRestaurantOwnerRequest;
 import com.restaurant.management.dto.response.RestaurantOwnerResponse;
+import com.restaurant.management.exception.CnpjAlreadyExistsException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,16 +22,41 @@ import java.util.List;
 @Service
 public class RestaurantOwnerService extends BaseUserService<RestaurantOwner> {
 
+    /** Mesma instância de {@code repository}, na forma concreta, para as consultas por CNPJ. */
+    private final RestaurantOwnerRepository restaurantOwnerRepository;
+
     public RestaurantOwnerService(RestaurantOwnerRepository restaurantOwnerRepository,
                                   UserRepository userRepository,
                                   BCryptPasswordEncoder passwordEncoder) {
         super(restaurantOwnerRepository, userRepository, passwordEncoder);
+        this.restaurantOwnerRepository = restaurantOwnerRepository;
+    }
+
+    /**
+     * Garante que o CNPJ não pertença a outro dono, recusando a duplicidade com uma mensagem
+     * que aponta o campo — em vez de deixar a constraint do banco cair no tratamento genérico.
+     * <p>
+     * CNPJ ausente não é checado: o campo é opcional e o banco aceita vários registros sem ele.
+     *
+     * @param currentUserId id do próprio dono em uma atualização,
+     *                      ou {@code null} quando for um cadastro novo
+     */
+    private void ensureCnpjIsAvailable(String cnpj, Long currentUserId) {
+        if (cnpj == null || cnpj.isBlank()) {
+            return;
+        }
+        restaurantOwnerRepository.findByCnpj(cnpj)
+                .filter(other -> !other.getId().equals(currentUserId))
+                .ifPresent(other -> {
+                    throw new CnpjAlreadyExistsException(cnpj);
+                });
     }
 
     @Transactional
     public RestaurantOwnerResponse create(CreateRestaurantOwnerRequest request) {
         ensureEmailIsAvailable(request.email(), null);
         ensureLoginIsAvailable(request.login(), null);
+        ensureCnpjIsAvailable(request.cnpj(), null);
 
         RestaurantOwner owner = RestaurantOwner.builder()
                 .name(request.name())
@@ -73,6 +99,7 @@ public class RestaurantOwnerService extends BaseUserService<RestaurantOwner> {
 
         ensureEmailIsAvailable(request.email(), id);
         ensureLoginIsAvailable(request.login(), id);
+        ensureCnpjIsAvailable(request.cnpj(), id);
 
         owner.setName(request.name());
         owner.setEmail(request.email().toLowerCase());

@@ -10,6 +10,7 @@ import com.restaurant.management.dto.request.ChangePasswordRequest;
 import com.restaurant.management.dto.request.CreateRestaurantOwnerRequest;
 import com.restaurant.management.dto.request.UpdateRestaurantOwnerRequest;
 import com.restaurant.management.dto.response.RestaurantOwnerResponse;
+import com.restaurant.management.exception.CnpjAlreadyExistsException;
 import com.restaurant.management.exception.EmailAlreadyExistsException;
 import com.restaurant.management.exception.InvalidPasswordException;
 import com.restaurant.management.exception.LoginAlreadyExistsException;
@@ -118,6 +119,25 @@ class RestaurantOwnerServiceTest {
             assertThatThrownBy(() -> ownerService.create(request))
                     .isInstanceOf(LoginAlreadyExistsException.class)
                     .hasMessageContaining("carlos.eduardo");
+
+            verify(restaurantOwnerRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve lançar CnpjAlreadyExistsException quando CNPJ já estiver em uso")
+        void shouldThrowCnpjAlreadyExistsException_WhenCnpjIsDuplicate() {
+            CreateRestaurantOwnerRequest request = new CreateRestaurantOwnerRequest(
+                    "Carlos Eduardo", "novo@bistro.com", "novo.login", "Senha@123",
+                    null, "Bistrô Francês", "12.345.678/0001-90"
+            );
+
+            when(userRepository.findByEmail("novo@bistro.com")).thenReturn(Optional.empty());
+            when(userRepository.findByLoginIgnoreCase("novo.login")).thenReturn(Optional.empty());
+            when(restaurantOwnerRepository.findByCnpj("12.345.678/0001-90")).thenReturn(Optional.of(sampleOwner));
+
+            assertThatThrownBy(() -> ownerService.create(request))
+                    .isInstanceOf(CnpjAlreadyExistsException.class)
+                    .hasMessageContaining("12.345.678/0001-90");
 
             verify(restaurantOwnerRepository, never()).save(any());
         }

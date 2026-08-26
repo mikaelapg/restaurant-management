@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -37,6 +38,7 @@ public record UpdateRestaurantOwnerRequest(
         @Schema(description = "Novo nome do restaurante", example = "Restaurante Premium do João")
         String restaurantName,
 
+        @Pattern(regexp = "\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}", message = "O CNPJ deve seguir o formato 00.000.000/0000-00")
         @Schema(description = "Novo CNPJ", example = "12.345.678/0001-90")
         String cnpj
 ) {

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -38,6 +39,7 @@ public record CreateCustomerRequest(
         @Schema(description = "Endereço do cliente")
         AddressRequest address,
 
+        @Pattern(regexp = "\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}", message = "O CPF deve seguir o formato 000.000.000-00")
         @Schema(description = "CPF do cliente", example = "123.456.789-00")
         String cpf,
 
