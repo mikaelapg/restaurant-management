@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -43,6 +44,7 @@ public record CreateCustomerRequest(
         @Schema(description = "CPF do cliente", example = "123.456.789-00")
         String cpf,
 
+        @Past(message = "A data de nascimento deve estar no passado")
         @Schema(description = "Data de nascimento (YYYY-MM-DD)", example = "1995-07-15", type = "string")
         LocalDate dateOfBirth
 ) {

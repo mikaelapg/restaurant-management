@@ -126,6 +126,19 @@ class CustomerControllerTest {
     }
 
     @Test
+    @DisplayName("POST com data de nascimento no futuro devolve 400 apontando o campo")
+    void shouldReturn400WhenDateOfBirthIsInTheFuture() throws Exception {
+        String payload = """
+                {"name": "Maria Silva", "email": "maria@email.com", "login": "maria.silva",
+                 "password": "Senha@123", "cpf": "123.456.789-00", "dateOfBirth": "2090-01-01"}""";
+
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Erro de Validação"))
+                .andExpect(jsonPath("$.fieldErrors.dateOfBirth").exists());
+    }
+
+    @Test
     @DisplayName("POST com e-mail repetido devolve 409 no formato ProblemDetail")
     void shouldReturn409WhenEmailIsTaken() throws Exception {
         when(customerService.create(any(CreateCustomerRequest.class)))
