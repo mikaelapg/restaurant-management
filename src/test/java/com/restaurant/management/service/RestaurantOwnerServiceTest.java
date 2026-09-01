@@ -4,17 +4,13 @@ import com.restaurant.management.domain.enums.UserType;
 import com.restaurant.management.domain.model.Address;
 import com.restaurant.management.domain.model.RestaurantOwner;
 import com.restaurant.management.domain.repository.RestaurantOwnerRepository;
-import com.restaurant.management.domain.repository.UserRepository;
 import com.restaurant.management.dto.request.AddressRequest;
-import com.restaurant.management.dto.request.ChangePasswordRequest;
 import com.restaurant.management.dto.request.CreateRestaurantOwnerRequest;
 import com.restaurant.management.dto.request.UpdateRestaurantOwnerRequest;
+import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.dto.response.RestaurantOwnerResponse;
 import com.restaurant.management.exception.CnpjAlreadyExistsException;
-import com.restaurant.management.exception.EmailAlreadyExistsException;
-import com.restaurant.management.exception.InvalidPasswordException;
 import com.restaurant.management.exception.LoginAlreadyExistsException;
-import com.restaurant.management.exception.UserNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,6 +19,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.List;
@@ -31,23 +30,24 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Testes Unitários — RestaurantOwnerService")
+@DisplayName("Testes Unitários — RestaurantOwnerServiceImpl")
 class RestaurantOwnerServiceTest {
 
     @Mock
     private RestaurantOwnerRepository restaurantOwnerRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private UserUniquenessValidator uniquenessValidator;
 
     @Mock
     private BCryptPasswordEncoder passwordEncoder;
 
     @InjectMocks
-    private RestaurantOwnerService ownerService;
+    private RestaurantOwnerServiceImpl ownerService;
 
     private RestaurantOwner sampleOwner;
     private AddressRequest sampleAddressRequest;
@@ -90,8 +90,6 @@ class RestaurantOwnerServiceTest {
                     sampleAddressRequest, "Bistrô Francês", "12.345.678/0001-90"
             );
 
-            when(userRepository.findByEmail("carlos@bistro.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLoginIgnoreCase("carlos.eduardo")).thenReturn(Optional.empty());
             when(passwordEncoder.encode("Senha@123")).thenReturn("$2a$10$encodedPassword");
             when(restaurantOwnerRepository.save(any(RestaurantOwner.class))).thenReturn(sampleOwner);
 
@@ -102,6 +100,8 @@ class RestaurantOwnerServiceTest {
             assertThat(response.name()).isEqualTo("Carlos Eduardo");
             assertThat(response.userType()).isEqualTo(UserType.RESTAURANT_OWNER);
             assertThat(response.restaurantName()).isEqualTo("Bistrô Francês");
+            verify(uniquenessValidator).ensureEmailAvailable("carlos@bistro.com", null);
+            verify(uniquenessValidator).ensureLoginAvailable("carlos.eduardo", null);
             verify(restaurantOwnerRepository).save(any(RestaurantOwner.class));
         }
 
@@ -113,8 +113,8 @@ class RestaurantOwnerServiceTest {
                     null, "Bistrô Francês", "12.345.678/0001-90"
             );
 
-            when(userRepository.findByEmail("novo@bistro.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLoginIgnoreCase("carlos.eduardo")).thenReturn(Optional.of(sampleOwner));
+            doThrow(new LoginAlreadyExistsException("carlos.eduardo"))
+                    .when(uniquenessValidator).ensureLoginAvailable("carlos.eduardo", null);
 
             assertThatThrownBy(() -> ownerService.create(request))
                     .isInstanceOf(LoginAlreadyExistsException.class)
@@ -131,8 +131,6 @@ class RestaurantOwnerServiceTest {
                     null, "Bistrô Francês", "12.345.678/0001-90"
             );
 
-            when(userRepository.findByEmail("novo@bistro.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLoginIgnoreCase("novo.login")).thenReturn(Optional.empty());
             when(restaurantOwnerRepository.findByCnpj("12.345.678/0001-90")).thenReturn(Optional.of(sampleOwner));
 
             assertThatThrownBy(() -> ownerService.create(request))
@@ -180,6 +178,19 @@ class RestaurantOwnerServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.id()).isEqualTo(1L);
             assertThat(response.restaurantName()).isEqualTo("Bistrô Francês");
+        }
+
+        @Test
+        @DisplayName("Deve listar donos de forma paginada, filtrando pelo nome")
+        void shouldListOwnersPaged_WhenNameIsProvided() {
+            when(restaurantOwnerRepository.findByNameContainingIgnoreCase(eq("Carlos"), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(sampleOwner)));
+
+            PageResponse<RestaurantOwnerResponse> result = ownerService.findAll("Carlos", PageRequest.of(0, 20));
+
+            assertThat(result.content()).hasSize(1);
+            assertThat(result.last()).isTrue();
+            verify(restaurantOwnerRepository).findByNameContainingIgnoreCase(eq("Carlos"), any(Pageable.class));
         }
 
         @Test

@@ -5,10 +5,10 @@ import com.restaurant.management.dto.request.ChangePasswordRequest;
 import com.restaurant.management.dto.request.CreateCustomerRequest;
 import com.restaurant.management.dto.request.UpdateCustomerRequest;
 import com.restaurant.management.dto.response.CustomerResponse;
+import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -17,6 +17,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,8 +31,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * Cadastro e manutenção de clientes.
@@ -69,14 +69,16 @@ public class CustomerController {
 
     @GetMapping
     @Operation(summary = "Listar ou buscar clientes pelo nome",
-            description = "Sem o parâmetro `name`, devolve todos. Com ele, filtra pelo trecho informado, ignorando maiúsculas e minúsculas.")
+            description = "Sem o parâmetro `name`, devolve todos. Com ele, filtra pelo trecho informado, ignorando maiúsculas e minúsculas. "
+                    + "O resultado é paginado: use `page` (base zero), `size` e `sort` (ex.: `sort=name,asc`).")
     @ApiResponse(responseCode = "200", description = "Consulta realizada",
             content = @Content(mediaType = "application/json",
-                    array = @ArraySchema(schema = @Schema(implementation = CustomerResponse.class))))
-    public ResponseEntity<List<CustomerResponse>> findAll(
+                    schema = @Schema(implementation = PageResponse.class)))
+    public ResponseEntity<PageResponse<CustomerResponse>> findAll(
             @Parameter(description = "Trecho do nome para filtrar", example = "Maria")
-            @RequestParam(required = false) String name) {
-        return ResponseEntity.ok(customerService.findAll(name));
+            @RequestParam(required = false) String name,
+            @ParameterObject Pageable pageable) {
+        return ResponseEntity.ok(customerService.findAll(name, pageable));
     }
 
     @GetMapping("/{id}")

@@ -1,5 +1,6 @@
 package com.restaurant.management.dto.request;
 
+import com.restaurant.management.dto.request.validation.StrongPassword;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -32,8 +33,8 @@ public record CreateCustomerRequest(
         String login,
 
         @NotBlank(message = "A senha é obrigatória")
-        @Size(min = 6, message = "A senha deve ter no mínimo 6 caracteres")
-        @Schema(description = "Senha de acesso (mínimo 6 caracteres)", example = "Senha@456")
+        @StrongPassword
+        @Schema(description = "Senha de acesso: mínimo 8 caracteres, com minúscula, maiúscula, dígito e caractere especial", example = "Senha@456")
         String password,
 
         @Valid

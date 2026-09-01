@@ -52,33 +52,40 @@ public final class OpenApiExamples {
             }""";
 
     public static final String USER_LIST = """
-            [
-              {
-                "id": 1,
-                "userType": "RESTAURANT_OWNER",
-                "name": "João Silva",
-                "email": "joao@restaurante.com",
-                "login": "joao.silva",
-                "lastModifiedAt": "2025-08-24T21:00:00",
-                "address": {
-                  "street": "Av. Paulista",
-                  "number": "1000",
-                  "complement": null,
-                  "city": "São Paulo",
-                  "state": "SP",
-                  "zipCode": "01310-100"
+            {
+              "content": [
+                {
+                  "id": 1,
+                  "userType": "RESTAURANT_OWNER",
+                  "name": "João Silva",
+                  "email": "joao@restaurante.com",
+                  "login": "joao.silva",
+                  "lastModifiedAt": "2025-08-24T21:00:00",
+                  "address": {
+                    "street": "Av. Paulista",
+                    "number": "1000",
+                    "complement": null,
+                    "city": "São Paulo",
+                    "state": "SP",
+                    "zipCode": "01310-100"
+                  }
+                },
+                {
+                  "id": 2,
+                  "userType": "CUSTOMER",
+                  "name": "Maria Silva",
+                  "email": "maria@email.com",
+                  "login": "maria.silva",
+                  "lastModifiedAt": "2025-08-24T21:05:00",
+                  "address": null
                 }
-              },
-              {
-                "id": 2,
-                "userType": "CUSTOMER",
-                "name": "Maria Silva",
-                "email": "maria@email.com",
-                "login": "maria.silva",
-                "lastModifiedAt": "2025-08-24T21:05:00",
-                "address": null
-              }
-            ]""";
+              ],
+              "page": 0,
+              "size": 20,
+              "totalElements": 2,
+              "totalPages": 1,
+              "last": true
+            }""";
 
     public static final String LOGIN_SUCCESS = """
             {
@@ -100,7 +107,7 @@ public final class OpenApiExamples {
               "timestamp": "2025-08-24T21:00:00Z",
               "fieldErrors": {
                 "email": "O e-mail deve ser válido",
-                "password": "A senha deve ter no mínimo 6 caracteres"
+                "password": "A senha deve ter no mínimo 8 caracteres, incluindo letra minúscula, maiúscula, dígito e caractere especial, sem espaços"
               }
             }""";
 

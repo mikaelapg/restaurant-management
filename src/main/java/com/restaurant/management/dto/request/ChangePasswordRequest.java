@@ -1,8 +1,8 @@
 package com.restaurant.management.dto.request;
 
+import com.restaurant.management.dto.request.validation.StrongPassword;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
 /**
  * DTO para troca de senha do usuário.
@@ -18,8 +18,8 @@ public record ChangePasswordRequest(
         String currentPassword,
 
         @NotBlank(message = "A nova senha é obrigatória")
-        @Size(min = 6, message = "A nova senha deve ter no mínimo 6 caracteres")
-        @Schema(description = "Nova senha (mínimo 6 caracteres)", example = "NovaSenha@456")
+        @StrongPassword
+        @Schema(description = "Nova senha: mínimo 8 caracteres, com minúscula, maiúscula, dígito e caractere especial", example = "NovaSenha@456")
         String newPassword,
 
         @NotBlank(message = "A confirmação da nova senha é obrigatória")

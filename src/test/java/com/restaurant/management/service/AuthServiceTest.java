@@ -24,7 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Testes Unitários — AuthService")
+@DisplayName("Testes Unitários — AuthServiceImpl")
 class AuthServiceTest {
 
     @Mock
@@ -34,7 +34,7 @@ class AuthServiceTest {
     private BCryptPasswordEncoder passwordEncoder;
 
     @InjectMocks
-    private AuthService authService;
+    private AuthServiceImpl authService;
 
     @Nested
     @DisplayName("Autenticação de Usuário (Login)")

@@ -8,6 +8,7 @@ import com.restaurant.management.dto.request.CreateCustomerRequest;
 import com.restaurant.management.dto.request.UpdateCustomerRequest;
 import com.restaurant.management.dto.response.AddressResponse;
 import com.restaurant.management.dto.response.CustomerResponse;
+import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.exception.EmailAlreadyExistsException;
 import com.restaurant.management.exception.InvalidPasswordException;
 import com.restaurant.management.exception.UserNotFoundException;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -72,6 +74,11 @@ class CustomerControllerTest {
         );
     }
 
+    private PageResponse<CustomerResponse> pageOf(CustomerResponse... items) {
+        List<CustomerResponse> content = List.of(items);
+        return new PageResponse<>(content, 0, 20, content.size(), 1, true);
+    }
+
     private CreateCustomerRequest validCreateRequest() {
         return new CreateCustomerRequest(
                 "Maria Oliveira", "maria@email.com", "maria.oliveira", "Senha@456",
@@ -109,6 +116,19 @@ class CustomerControllerTest {
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.fieldErrors.name").exists())
                 .andExpect(jsonPath("$.fieldErrors.email").exists())
+                .andExpect(jsonPath("$.fieldErrors.password").exists());
+    }
+
+    @Test
+    @DisplayName("POST com senha de 6 caracteres sem complexidade devolve 400 (@StrongPassword)")
+    void shouldReturn400WhenPasswordIsWeak() throws Exception {
+        String payload = """
+                {"name": "Maria Silva", "email": "maria@email.com", "login": "maria.silva",
+                 "password": "abcdef"}""";
+
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Erro de Validação"))
                 .andExpect(jsonPath("$.fieldErrors.password").exists());
     }
 
@@ -154,28 +174,44 @@ class CustomerControllerTest {
     }
 
     @Test
-    @DisplayName("GET sem filtro lista todos os clientes")
+    @DisplayName("GET sem filtro lista todos os clientes, em um envelope de página")
     void shouldListAllWhenNoNameFilter() throws Exception {
-        when(customerService.findAll(null)).thenReturn(List.of(sampleResponse()));
+        when(customerService.findAll(eq(null), any(Pageable.class))).thenReturn(pageOf(sampleResponse()));
 
         mockMvc.perform(get(BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$[0].id").value(2));
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].id").value(2))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.last").value(true));
 
-        verify(customerService).findAll(null);
+        verify(customerService).findAll(eq(null), any(Pageable.class));
     }
 
     @Test
     @DisplayName("GET com name repassa o filtro para o service")
     void shouldForwardNameFilter() throws Exception {
-        when(customerService.findAll("Maria")).thenReturn(List.of(sampleResponse()));
+        when(customerService.findAll(eq("Maria"), any(Pageable.class))).thenReturn(pageOf(sampleResponse()));
 
         mockMvc.perform(get(BASE).param("name", "Maria"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Maria Oliveira"));
+                .andExpect(jsonPath("$.content[0].name").value("Maria Oliveira"));
 
-        verify(customerService).findAll("Maria");
+        verify(customerService).findAll(eq("Maria"), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("GET repassa page e size para o service via Pageable")
+    void shouldForwardPaginationParameters() throws Exception {
+        when(customerService.findAll(eq(null), any(Pageable.class))).thenReturn(pageOf(sampleResponse()));
+
+        mockMvc.perform(get(BASE).param("page", "2").param("size", "5"))
+                .andExpect(status().isOk());
+
+        org.mockito.ArgumentCaptor<Pageable> captor = org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(customerService).findAll(eq(null), captor.capture());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().getPageNumber()).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().getPageSize()).isEqualTo(5);
     }
 
     @Test

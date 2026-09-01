@@ -1,133 +1,30 @@
 package com.restaurant.management.service;
 
-import com.restaurant.management.domain.model.RestaurantOwner;
-import com.restaurant.management.domain.repository.RestaurantOwnerRepository;
-import com.restaurant.management.domain.repository.UserRepository;
+import com.restaurant.management.dto.request.ChangePasswordRequest;
 import com.restaurant.management.dto.request.CreateRestaurantOwnerRequest;
 import com.restaurant.management.dto.request.UpdateRestaurantOwnerRequest;
+import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.dto.response.RestaurantOwnerResponse;
-import com.restaurant.management.exception.CnpjAlreadyExistsException;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
+import org.springframework.data.domain.Pageable;
 
 /**
- * Regras de negócio dos donos de restaurante.
- * Troca de senha e exclusão vêm de {@link BaseUserService}.
+ * Regras de negócio do dono de restaurante.
+ * <p>
+ * A abstração existe para que a camada web (e os testes) dependam do contrato,
+ * não da implementação (Princípio da Inversão de Dependência).
  */
-@Slf4j
-@Service
-public class RestaurantOwnerService extends BaseUserService<RestaurantOwner> {
+public interface RestaurantOwnerService {
 
-    /** Mesma instância de {@code repository}, na forma concreta, para as consultas por CNPJ. */
-    private final RestaurantOwnerRepository restaurantOwnerRepository;
+    RestaurantOwnerResponse create(CreateRestaurantOwnerRequest request);
 
-    public RestaurantOwnerService(RestaurantOwnerRepository restaurantOwnerRepository,
-                                  UserRepository userRepository,
-                                  BCryptPasswordEncoder passwordEncoder) {
-        super(restaurantOwnerRepository, userRepository, passwordEncoder);
-        this.restaurantOwnerRepository = restaurantOwnerRepository;
-    }
+    PageResponse<RestaurantOwnerResponse> findAll(String name, Pageable pageable);
 
-    /**
-     * Garante que o CNPJ não pertença a outro dono, recusando a duplicidade com uma mensagem
-     * que aponta o campo — em vez de deixar a constraint do banco cair no tratamento genérico.
-     * <p>
-     * CNPJ ausente não é checado: o campo é opcional e o banco aceita vários registros sem ele.
-     *
-     * @param currentUserId id do próprio dono em uma atualização,
-     *                      ou {@code null} quando for um cadastro novo
-     */
-    private void ensureCnpjIsAvailable(String cnpj, Long currentUserId) {
-        if (cnpj == null || cnpj.isBlank()) {
-            return;
-        }
-        restaurantOwnerRepository.findByCnpj(cnpj)
-                .filter(other -> !other.getId().equals(currentUserId))
-                .ifPresent(other -> {
-                    throw new CnpjAlreadyExistsException(cnpj);
-                });
-    }
+    RestaurantOwnerResponse findById(Long id);
 
-    @Transactional
-    public RestaurantOwnerResponse create(CreateRestaurantOwnerRequest request) {
-        ensureEmailIsAvailable(request.email(), null);
-        ensureLoginIsAvailable(request.login(), null);
-        ensureCnpjIsAvailable(request.cnpj(), null);
+    RestaurantOwnerResponse update(Long id, UpdateRestaurantOwnerRequest request);
 
-        RestaurantOwner owner = RestaurantOwner.builder()
-                .name(request.name())
-                .email(request.email().toLowerCase())
-                .login(request.login())
-                .password(passwordEncoder.encode(request.password()))
-                .address(AddressMapper.toEntity(request.address()))
-                .restaurantName(request.restaurantName())
-                .cnpj(request.cnpj())
-                .build();
+    /** Troca de senha com verificação da senha atual. Contrato comum a qualquer usuário. */
+    void changePassword(Long id, ChangePasswordRequest request);
 
-        RestaurantOwner saved = repository.save(owner);
-        log.info("Dono de restaurante cadastrado com o id {}", saved.getId());
-        return toResponse(saved);
-    }
-
-    @Transactional(readOnly = true)
-    public List<RestaurantOwnerResponse> findAll(String name) {
-        List<RestaurantOwner> owners = (name == null || name.isBlank())
-                ? repository.findAll()
-                : repository.findByNameContainingIgnoreCase(name);
-
-        return owners.stream().map(this::toResponse).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public RestaurantOwnerResponse findById(Long id) {
-        return toResponse(findOrThrow(id));
-    }
-
-    /**
-     * Atualiza os dados cadastrais do dono. A senha não passa por aqui —
-     * ela tem endpoint exclusivo em {@code PATCH /api/v1/restaurant-owners/{id}/password}.
-     * <p>
-     * Endereço nulo significa "não mexer", e não "apagar".
-     */
-    @Transactional
-    public RestaurantOwnerResponse update(Long id, UpdateRestaurantOwnerRequest request) {
-        RestaurantOwner owner = findOrThrow(id);
-
-        ensureEmailIsAvailable(request.email(), id);
-        ensureLoginIsAvailable(request.login(), id);
-        ensureCnpjIsAvailable(request.cnpj(), id);
-
-        owner.setName(request.name());
-        owner.setEmail(request.email().toLowerCase());
-        owner.setLogin(request.login());
-        owner.setRestaurantName(request.restaurantName());
-        owner.setCnpj(request.cnpj());
-        if (request.address() != null) {
-            owner.setAddress(AddressMapper.toEntity(request.address()));
-        }
-
-        log.info("Dados do dono de restaurante {} atualizados", id);
-        // saveAndFlush: o @UpdateTimestamp só é aplicado no flush. Com save(), o DTO seria
-        // montado antes disso e devolveria o lastModifiedAt do cadastro, não o da alteração.
-        return toResponse(repository.saveAndFlush(owner));
-    }
-
-    /** A senha nunca é devolvida na resposta. */
-    private RestaurantOwnerResponse toResponse(RestaurantOwner owner) {
-        return new RestaurantOwnerResponse(
-                owner.getId(),
-                owner.getUserType(),
-                owner.getName(),
-                owner.getEmail(),
-                owner.getLogin(),
-                owner.getLastModifiedAt(),
-                AddressMapper.toResponse(owner.getAddress()),
-                owner.getRestaurantName(),
-                owner.getCnpj()
-        );
-    }
+    void delete(Long id);
 }

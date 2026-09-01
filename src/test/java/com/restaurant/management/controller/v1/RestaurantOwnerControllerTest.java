@@ -5,6 +5,7 @@ import com.restaurant.management.domain.enums.UserType;
 import com.restaurant.management.dto.request.ChangePasswordRequest;
 import com.restaurant.management.dto.request.CreateRestaurantOwnerRequest;
 import com.restaurant.management.dto.response.AddressResponse;
+import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.dto.response.RestaurantOwnerResponse;
 import com.restaurant.management.exception.UserNotFoundException;
 import com.restaurant.management.service.RestaurantOwnerService;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -83,15 +85,18 @@ class RestaurantOwnerControllerTest {
     }
 
     @Test
-    @DisplayName("GET com name busca donos pelo nome")
+    @DisplayName("GET com name busca donos pelo nome, em um envelope de página")
     void shouldSearchByName() throws Exception {
-        when(restaurantOwnerService.findAll("João")).thenReturn(List.of(sampleResponse()));
+        List<RestaurantOwnerResponse> content = List.of(sampleResponse());
+        when(restaurantOwnerService.findAll(eq("João"), any(Pageable.class)))
+                .thenReturn(new PageResponse<>(content, 0, 20, 1, 1, true));
 
         mockMvc.perform(get(BASE).param("name", "João"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("João Silva"));
+                .andExpect(jsonPath("$.content[0].name").value("João Silva"))
+                .andExpect(jsonPath("$.totalElements").value(1));
 
-        verify(restaurantOwnerService).findAll("João");
+        verify(restaurantOwnerService).findAll(eq("João"), any(Pageable.class));
     }
 
     @Test

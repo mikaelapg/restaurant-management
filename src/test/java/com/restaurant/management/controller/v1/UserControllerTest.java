@@ -1,6 +1,7 @@
 package com.restaurant.management.controller.v1;
 
 import com.restaurant.management.domain.enums.UserType;
+import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.dto.response.UserResponse;
 import com.restaurant.management.exception.UserNotFoundException;
 import com.restaurant.management.service.UserService;
@@ -9,12 +10,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -48,30 +52,35 @@ class UserControllerTest {
                 "maria@email.com", "maria.silva", LocalDateTime.of(2025, 8, 24, 21, 5), null);
     }
 
+    private PageResponse<UserResponse> pageOf(UserResponse... items) {
+        List<UserResponse> content = List.of(items);
+        return new PageResponse<>(content, 0, 20, content.size(), 1, true);
+    }
+
     @Test
-    @DisplayName("GET sem filtro devolve os dois tipos de usuário")
+    @DisplayName("GET sem filtro devolve os dois tipos de usuário, em um envelope de página")
     void shouldListBothUserTypes() throws Exception {
-        when(userService.findAll(null)).thenReturn(List.of(owner(), customer()));
+        when(userService.findAll(eq(null), any(Pageable.class))).thenReturn(pageOf(owner(), customer()));
 
         mockMvc.perform(get(BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$[0].userType").value("RESTAURANT_OWNER"))
-                .andExpect(jsonPath("$[1].userType").value("CUSTOMER"));
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].userType").value("RESTAURANT_OWNER"))
+                .andExpect(jsonPath("$.content[1].userType").value("CUSTOMER"));
 
-        verify(userService).findAll(null);
+        verify(userService).findAll(eq(null), any(Pageable.class));
     }
 
     @Test
     @DisplayName("GET com name filtra pelo trecho informado")
     void shouldSearchByName() throws Exception {
-        when(userService.findAll("Silva")).thenReturn(List.of(owner(), customer()));
+        when(userService.findAll(eq("Silva"), any(Pageable.class))).thenReturn(pageOf(owner(), customer()));
 
         mockMvc.perform(get(BASE).param("name", "Silva"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.content.length()").value(2));
 
-        verify(userService).findAll("Silva");
+        verify(userService).findAll(eq("Silva"), any(Pageable.class));
     }
 
     @Test

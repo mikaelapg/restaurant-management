@@ -4,12 +4,12 @@ import com.restaurant.management.domain.enums.UserType;
 import com.restaurant.management.domain.model.Address;
 import com.restaurant.management.domain.model.Customer;
 import com.restaurant.management.domain.repository.CustomerRepository;
-import com.restaurant.management.domain.repository.UserRepository;
 import com.restaurant.management.dto.request.AddressRequest;
 import com.restaurant.management.dto.request.ChangePasswordRequest;
 import com.restaurant.management.dto.request.CreateCustomerRequest;
 import com.restaurant.management.dto.request.UpdateCustomerRequest;
 import com.restaurant.management.dto.response.CustomerResponse;
+import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.exception.CpfAlreadyExistsException;
 import com.restaurant.management.exception.EmailAlreadyExistsException;
 import com.restaurant.management.exception.InvalidPasswordException;
@@ -23,6 +23,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.LocalDate;
@@ -32,23 +35,24 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Testes Unitários — CustomerService")
+@DisplayName("Testes Unitários — CustomerServiceImpl")
 class CustomerServiceTest {
 
     @Mock
     private CustomerRepository customerRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private UserUniquenessValidator uniquenessValidator;
 
     @Mock
     private BCryptPasswordEncoder passwordEncoder;
 
     @InjectMocks
-    private CustomerService customerService;
+    private CustomerServiceImpl customerService;
 
     private Customer sampleCustomer;
     private AddressRequest sampleAddressRequest;
@@ -91,8 +95,6 @@ class CustomerServiceTest {
                     sampleAddressRequest, "123.456.789-00", LocalDate.of(1995, 5, 20)
             );
 
-            when(userRepository.findByEmail("maria@email.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLoginIgnoreCase("maria.silva")).thenReturn(Optional.empty());
             when(passwordEncoder.encode("Senha@123")).thenReturn("$2a$10$encodedPassword");
             when(customerRepository.save(any(Customer.class))).thenReturn(sampleCustomer);
 
@@ -102,6 +104,8 @@ class CustomerServiceTest {
             assertThat(response.id()).isEqualTo(1L);
             assertThat(response.name()).isEqualTo("Maria Silva");
             assertThat(response.userType()).isEqualTo(UserType.CUSTOMER);
+            verify(uniquenessValidator).ensureEmailAvailable("maria@email.com", null);
+            verify(uniquenessValidator).ensureLoginAvailable("maria.silva", null);
             verify(customerRepository).save(any(Customer.class));
         }
 
@@ -113,7 +117,8 @@ class CustomerServiceTest {
                     null, "123.456.789-00", LocalDate.of(1995, 5, 20)
             );
 
-            when(userRepository.findByEmail("maria@email.com")).thenReturn(Optional.of(sampleCustomer));
+            doThrow(new EmailAlreadyExistsException("maria@email.com"))
+                    .when(uniquenessValidator).ensureEmailAvailable("maria@email.com", null);
 
             assertThatThrownBy(() -> customerService.create(request))
                     .isInstanceOf(EmailAlreadyExistsException.class)
@@ -130,8 +135,8 @@ class CustomerServiceTest {
                     null, "123.456.789-00", LocalDate.of(1995, 5, 20)
             );
 
-            when(userRepository.findByEmail("novo@email.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLoginIgnoreCase("maria.silva")).thenReturn(Optional.of(sampleCustomer));
+            doThrow(new LoginAlreadyExistsException("maria.silva"))
+                    .when(uniquenessValidator).ensureLoginAvailable("maria.silva", null);
 
             assertThatThrownBy(() -> customerService.create(request))
                     .isInstanceOf(LoginAlreadyExistsException.class)
@@ -148,8 +153,6 @@ class CustomerServiceTest {
                     null, "123.456.789-00", LocalDate.of(1995, 5, 20)
             );
 
-            when(userRepository.findByEmail("novo@email.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLoginIgnoreCase("novo.login")).thenReturn(Optional.empty());
             when(customerRepository.findByCpf("123.456.789-00")).thenReturn(Optional.of(sampleCustomer));
 
             assertThatThrownBy(() -> customerService.create(request))
@@ -167,8 +170,6 @@ class CustomerServiceTest {
                     null, null, LocalDate.of(1995, 5, 20)
             );
 
-            when(userRepository.findByEmail("maria@email.com")).thenReturn(Optional.empty());
-            when(userRepository.findByLoginIgnoreCase("maria.silva")).thenReturn(Optional.empty());
             when(passwordEncoder.encode("Senha@123")).thenReturn("$2a$10$encodedPassword");
             when(customerRepository.save(any(Customer.class))).thenReturn(sampleCustomer);
 
@@ -205,25 +206,28 @@ class CustomerServiceTest {
         }
 
         @Test
-        @DisplayName("Deve listar todos os clientes quando nome for nulo")
+        @DisplayName("Deve listar todos os clientes, paginados, quando nome for nulo")
         void shouldListAllCustomers_WhenNameIsNull() {
-            when(customerRepository.findAll()).thenReturn(List.of(sampleCustomer));
+            when(customerRepository.findAll(any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(sampleCustomer)));
 
-            List<CustomerResponse> result = customerService.findAll(null);
+            PageResponse<CustomerResponse> result = customerService.findAll(null, PageRequest.of(0, 20));
 
-            assertThat(result).hasSize(1);
-            verify(customerRepository).findAll();
+            assertThat(result.content()).hasSize(1);
+            assertThat(result.totalElements()).isEqualTo(1);
+            verify(customerRepository).findAll(any(Pageable.class));
         }
 
         @Test
-        @DisplayName("Deve filtrar clientes por nome quando parâmetro informado")
+        @DisplayName("Deve filtrar clientes por nome, paginados, quando parâmetro informado")
         void shouldFilterCustomers_WhenNameIsProvided() {
-            when(customerRepository.findByNameContainingIgnoreCase("Maria")).thenReturn(List.of(sampleCustomer));
+            when(customerRepository.findByNameContainingIgnoreCase(eq("Maria"), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(sampleCustomer)));
 
-            List<CustomerResponse> result = customerService.findAll("Maria");
+            PageResponse<CustomerResponse> result = customerService.findAll("Maria", PageRequest.of(0, 20));
 
-            assertThat(result).hasSize(1);
-            verify(customerRepository).findByNameContainingIgnoreCase("Maria");
+            assertThat(result.content()).hasSize(1);
+            verify(customerRepository).findByNameContainingIgnoreCase(eq("Maria"), any(Pageable.class));
         }
     }
 
