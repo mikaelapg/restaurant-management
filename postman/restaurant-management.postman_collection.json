@@ -1,1673 +1,1752 @@
 {
-  "info": {
-    "name": "Sistema de Gestão de Restaurantes — API v1",
-    "description": "Coleção de testes da API de gestão de restaurantes.\n\nAs pastas estão na ordem em que devem rodar: cada uma depende do que a anterior cadastrou. Dá para rodar tudo de uma vez pelo Collection Runner ou pelo Newman.\n\nOs ids de dono e cliente são capturados dos próprios cadastros, e cada execução gera e-mails, logins, CPF e CNPJ diferentes — então a coleção pode rodar várias vezes no mesmo banco sem esbarrar nas restrições de unicidade.\n\nAntes de rodar, suba a aplicação com `docker compose up -d --build`.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+ "info": {
+  "name": "Sistema de Gestão de Restaurantes — API v1",
+  "description": "Coleção de testes da API de gestão de restaurantes.\n\nAs pastas estão na ordem em que devem rodar: cada uma depende do que a anterior cadastrou. Dá para rodar tudo de uma vez pelo Collection Runner ou pelo Newman.\n\nOs ids de dono e cliente são capturados dos próprios cadastros, e cada execução gera e-mails, logins, CPF e CNPJ diferentes — então a coleção pode rodar várias vezes no mesmo banco sem esbarrar nas restrições de unicidade.\n\nAntes de rodar, suba a aplicação com `docker compose up -d --build`.",
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+ },
+ "item": [
+  {
+   "name": "1. Cadastro de usuários",
+   "item": [
+    {
+     "name": "Cadastrar dono de restaurante (201)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurant-owners",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurant-owners"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"{{owner_name}}\",\n  \"email\": \"{{owner_email}}\",\n  \"login\": \"{{owner_login}}\",\n  \"password\": \"Senha@123\",\n  \"restaurantName\": \"Restaurante do João\",\n  \"cnpj\": \"{{owner_cnpj}}\",\n  \"address\": {\n    \"street\": \"Av. Paulista\",\n    \"number\": \"1000\",\n    \"complement\": \"Conjunto 50\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01310-100\"\n  }\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "prerequest",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// Cada execução usa e-mails, logins, CPF e CNPJ próprios,",
+         "// para que a coleção possa rodar mais de uma vez no mesmo banco.",
+         "const runId = Date.now().toString().slice(-8);",
+         "",
+         "pm.collectionVariables.set(\"run_id\", runId);",
+         "pm.collectionVariables.set(\"owner_name\", \"João Silva \" + runId);",
+         "pm.collectionVariables.set(\"owner_email\", \"joao.silva.\" + runId + \"@restaurante.com\");",
+         "pm.collectionVariables.set(\"owner_login\", \"joao.silva.\" + runId);",
+         "pm.collectionVariables.set(\"owner_cnpj\", \"12.345.\" + runId.slice(0, 3) + \"/\" + runId.slice(3, 7) + \"-90\");",
+         "pm.collectionVariables.set(\"customer_name\", \"Maria Oliveira \" + runId);",
+         "pm.collectionVariables.set(\"customer_email\", \"maria.oliveira.\" + runId + \"@email.com\");",
+         "pm.collectionVariables.set(\"customer_login\", \"maria.oliveira.\" + runId);",
+         "pm.collectionVariables.set(\"customer_cpf\", runId.slice(0, 3) + \".\" + runId.slice(3, 6) + \".\" + runId.slice(6, 8) + \"1-00\");"
+        ]
+       }
+      },
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 201 Created\", function () {",
+         "    pm.response.to.have.status(201);",
+         "});",
+         "",
+         "const owner = pm.response.json();",
+         "",
+         "pm.test(\"Devolve o dono cadastrado com id\", function () {",
+         "    pm.expect(owner.id).to.be.a(\"number\");",
+         "    pm.expect(owner.userType).to.eql(\"RESTAURANT_OWNER\");",
+         "    pm.expect(owner.email).to.eql(pm.collectionVariables.get(\"owner_email\"));",
+         "    pm.expect(owner.restaurantName).to.eql(\"Restaurante do João\");",
+         "});",
+         "",
+         "pm.test(\"Registra a data da última alteração\", function () {",
+         "    pm.expect(owner.lastModifiedAt).to.be.a(\"string\");",
+         "});",
+         "",
+         "pm.test(\"Nunca devolve a senha\", function () {",
+         "    pm.expect(owner).to.not.have.property(\"password\");",
+         "});",
+         "",
+         "// Guarda o id para os próximos requests da coleção.",
+         "pm.collectionVariables.set(\"owner_id\", owner.id);"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastrar cliente (201)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"{{customer_name}}\",\n  \"email\": \"{{customer_email}}\",\n  \"login\": \"{{customer_login}}\",\n  \"password\": \"Senha@456\",\n  \"cpf\": \"{{customer_cpf}}\",\n  \"dateOfBirth\": \"1995-07-15\",\n  \"address\": {\n    \"street\": \"Rua dos Jardins\",\n    \"number\": \"250\",\n    \"city\": \"Rio de Janeiro\",\n    \"state\": \"RJ\",\n    \"zipCode\": \"22041-011\"\n  }\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 201 Created\", function () {",
+         "    pm.response.to.have.status(201);",
+         "});",
+         "",
+         "const customer = pm.response.json();",
+         "",
+         "pm.test(\"Devolve o cliente cadastrado com id\", function () {",
+         "    pm.expect(customer.id).to.be.a(\"number\");",
+         "    pm.expect(customer.userType).to.eql(\"CUSTOMER\");",
+         "    pm.expect(customer.email).to.eql(pm.collectionVariables.get(\"customer_email\"));",
+         "});",
+         "",
+         "pm.test(\"Grava o endereço enviado\", function () {",
+         "    pm.expect(customer.address.city).to.eql(\"Rio de Janeiro\");",
+         "});",
+         "",
+         "pm.test(\"Nunca devolve a senha\", function () {",
+         "    pm.expect(customer).to.not.have.property(\"password\");",
+         "});",
+         "",
+         "pm.collectionVariables.set(\"customer_id\", customer.id);"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: e-mail já usado (409)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurant-owners",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurant-owners"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Outro Dono\",\n  \"email\": \"{{owner_email}}\",\n  \"login\": \"outro.login.{{run_id}}\",\n  \"password\": \"Senha@123\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(409);",
+         "    pm.expect(problem.title).to.include(\"E-mail\");",
+         "});",
+         "",
+         "pm.test(\"A mensagem cita o e-mail recusado\", function () {",
+         "    pm.expect(pm.response.json().detail).to.include(pm.collectionVariables.get(\"owner_email\"));",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: campos obrigatórios faltando (400)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"\",\n  \"email\": \"email-invalido\",\n  \"login\": \"\",\n  \"password\": \"123\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 400\", function () {",
+         "    pm.response.to.have.status(400);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(400);",
+         "    pm.expect(problem.title).to.include(\"Validação\");",
+         "});",
+         "",
+         "pm.test(\"Aponta cada campo inválido\", function () {",
+         "    const fieldErrors = pm.response.json().fieldErrors;",
+         "    pm.expect(fieldErrors).to.be.an(\"object\");",
+         "    pm.expect(fieldErrors).to.have.property(\"name\");",
+         "    pm.expect(fieldErrors).to.have.property(\"email\");",
+         "    pm.expect(fieldErrors).to.have.property(\"login\");",
+         "    pm.expect(fieldErrors).to.have.property(\"password\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    }
+   ]
   },
-  "item": [
+  {
+   "name": "2. Validação de login",
+   "item": [
     {
-      "name": "1. Cadastro de usuários",
-      "item": [
-        {
-          "name": "Cadastrar dono de restaurante (201)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/restaurant-owners",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "restaurant-owners"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"{{owner_name}}\",\n  \"email\": \"{{owner_email}}\",\n  \"login\": \"{{owner_login}}\",\n  \"password\": \"Senha@123\",\n  \"restaurantName\": \"Restaurante do João\",\n  \"cnpj\": \"{{owner_cnpj}}\",\n  \"address\": {\n    \"street\": \"Av. Paulista\",\n    \"number\": \"1000\",\n    \"complement\": \"Conjunto 50\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01310-100\"\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// Cada execução usa e-mails, logins, CPF e CNPJ próprios,",
-                  "// para que a coleção possa rodar mais de uma vez no mesmo banco.",
-                  "const runId = Date.now().toString().slice(-8);",
-                  "",
-                  "pm.collectionVariables.set(\"run_id\", runId);",
-                  "pm.collectionVariables.set(\"owner_name\", \"João Silva \" + runId);",
-                  "pm.collectionVariables.set(\"owner_email\", \"joao.silva.\" + runId + \"@restaurante.com\");",
-                  "pm.collectionVariables.set(\"owner_login\", \"joao.silva.\" + runId);",
-                  "pm.collectionVariables.set(\"owner_cnpj\", \"12.345.\" + runId.slice(0, 3) + \"/\" + runId.slice(3, 7) + \"-90\");",
-                  "pm.collectionVariables.set(\"customer_name\", \"Maria Oliveira \" + runId);",
-                  "pm.collectionVariables.set(\"customer_email\", \"maria.oliveira.\" + runId + \"@email.com\");",
-                  "pm.collectionVariables.set(\"customer_login\", \"maria.oliveira.\" + runId);",
-                  "pm.collectionVariables.set(\"customer_cpf\", runId.slice(0, 3) + \".\" + runId.slice(3, 6) + \".\" + runId.slice(6, 8) + \"1-00\");"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 201 Created\", function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "",
-                  "const owner = pm.response.json();",
-                  "",
-                  "pm.test(\"Devolve o dono cadastrado com id\", function () {",
-                  "    pm.expect(owner.id).to.be.a(\"number\");",
-                  "    pm.expect(owner.userType).to.eql(\"RESTAURANT_OWNER\");",
-                  "    pm.expect(owner.email).to.eql(pm.collectionVariables.get(\"owner_email\"));",
-                  "    pm.expect(owner.restaurantName).to.eql(\"Restaurante do João\");",
-                  "});",
-                  "",
-                  "pm.test(\"Registra a data da última alteração\", function () {",
-                  "    pm.expect(owner.lastModifiedAt).to.be.a(\"string\");",
-                  "});",
-                  "",
-                  "pm.test(\"Nunca devolve a senha\", function () {",
-                  "    pm.expect(owner).to.not.have.property(\"password\");",
-                  "});",
-                  "",
-                  "// Guarda o id para os próximos requests da coleção.",
-                  "pm.collectionVariables.set(\"owner_id\", owner.id);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Cadastrar cliente (201)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"{{customer_name}}\",\n  \"email\": \"{{customer_email}}\",\n  \"login\": \"{{customer_login}}\",\n  \"password\": \"Senha@456\",\n  \"cpf\": \"{{customer_cpf}}\",\n  \"dateOfBirth\": \"1995-07-15\",\n  \"address\": {\n    \"street\": \"Rua dos Jardins\",\n    \"number\": \"250\",\n    \"city\": \"Rio de Janeiro\",\n    \"state\": \"RJ\",\n    \"zipCode\": \"22041-011\"\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 201 Created\", function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "",
-                  "const customer = pm.response.json();",
-                  "",
-                  "pm.test(\"Devolve o cliente cadastrado com id\", function () {",
-                  "    pm.expect(customer.id).to.be.a(\"number\");",
-                  "    pm.expect(customer.userType).to.eql(\"CUSTOMER\");",
-                  "    pm.expect(customer.email).to.eql(pm.collectionVariables.get(\"customer_email\"));",
-                  "});",
-                  "",
-                  "pm.test(\"Grava o endereço enviado\", function () {",
-                  "    pm.expect(customer.address.city).to.eql(\"Rio de Janeiro\");",
-                  "});",
-                  "",
-                  "pm.test(\"Nunca devolve a senha\", function () {",
-                  "    pm.expect(customer).to.not.have.property(\"password\");",
-                  "});",
-                  "",
-                  "pm.collectionVariables.set(\"customer_id\", customer.id);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Cadastro recusado: e-mail já usado (409)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/restaurant-owners",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "restaurant-owners"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Outro Dono\",\n  \"email\": \"{{owner_email}}\",\n  \"login\": \"outro.login.{{run_id}}\",\n  \"password\": \"Senha@123\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 409\", function () {",
-                  "    pm.response.to.have.status(409);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(409);",
-                  "    pm.expect(problem.title).to.include(\"E-mail\");",
-                  "});",
-                  "",
-                  "pm.test(\"A mensagem cita o e-mail recusado\", function () {",
-                  "    pm.expect(pm.response.json().detail).to.include(pm.collectionVariables.get(\"owner_email\"));",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Cadastro recusado: campos obrigatórios faltando (400)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"\",\n  \"email\": \"email-invalido\",\n  \"login\": \"\",\n  \"password\": \"123\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(400);",
-                  "    pm.expect(problem.title).to.include(\"Validação\");",
-                  "});",
-                  "",
-                  "pm.test(\"Aponta cada campo inválido\", function () {",
-                  "    const fieldErrors = pm.response.json().fieldErrors;",
-                  "    pm.expect(fieldErrors).to.be.an(\"object\");",
-                  "    pm.expect(fieldErrors).to.have.property(\"name\");",
-                  "    pm.expect(fieldErrors).to.have.property(\"email\");",
-                  "    pm.expect(fieldErrors).to.have.property(\"login\");",
-                  "    pm.expect(fieldErrors).to.have.property(\"password\");",
-                  "});"
-                ]
-              }
-            }
-          ]
+     "name": "Login do dono de restaurante (200)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/auth/login",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "auth",
+        "login"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"login\": \"{{owner_login}}\",\n  \"password\": \"Senha@123\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
         }
-      ]
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "const body = pm.response.json();",
+         "",
+         "pm.test(\"Identifica o usuário autenticado\", function () {",
+         "    pm.expect(body.id).to.eql(pm.collectionVariables.get(\"owner_id\"));",
+         "    pm.expect(body.login).to.eql(pm.collectionVariables.get(\"owner_login\"));",
+         "    pm.expect(body.userType).to.eql(\"RESTAURANT_OWNER\");",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "name": "2. Validação de login",
-      "item": [
-        {
-          "name": "Login do dono de restaurante (200)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"login\": \"{{owner_login}}\",\n  \"password\": \"Senha@123\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const body = pm.response.json();",
-                  "",
-                  "pm.test(\"Identifica o usuário autenticado\", function () {",
-                  "    pm.expect(body.id).to.eql(pm.collectionVariables.get(\"owner_id\"));",
-                  "    pm.expect(body.login).to.eql(pm.collectionVariables.get(\"owner_login\"));",
-                  "    pm.expect(body.userType).to.eql(\"RESTAURANT_OWNER\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Login do cliente (200)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"login\": \"{{customer_login}}\",\n  \"password\": \"Senha@456\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Identifica o cliente\", function () {",
-                  "    pm.expect(pm.response.json().userType).to.eql(\"CUSTOMER\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Login recusado: senha incorreta (401)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"login\": \"{{owner_login}}\",\n  \"password\": \"senhaErrada\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 401\", function () {",
-                  "    pm.response.to.have.status(401);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(401);",
-                  "    pm.expect(problem.title).to.include(\"Credenciais\");",
-                  "});",
-                  "",
-                  "pm.test(\"Não revela se o problema foi o login ou a senha\", function () {",
-                  "    pm.expect(pm.response.json().detail).to.include(\"Login ou senha inválidos\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Login recusado: login inexistente (401)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"login\": \"ninguem.aqui.{{run_id}}\",\n  \"password\": \"Senha@123\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 401\", function () {",
-                  "    pm.response.to.have.status(401);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(401);",
-                  "    pm.expect(problem.title).to.include(\"Credenciais\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Login recusado: campos vazios (400)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"login\": \"\",\n  \"password\": \"\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(400);",
-                  "    pm.expect(problem.title).to.include(\"Validação\");",
-                  "});"
-                ]
-              }
-            }
-          ]
+     "name": "Login do cliente (200)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/auth/login",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "auth",
+        "login"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"login\": \"{{customer_login}}\",\n  \"password\": \"Senha@456\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
         }
-      ]
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Identifica o cliente\", function () {",
+         "    pm.expect(pm.response.json().userType).to.eql(\"CUSTOMER\");",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "name": "3. Busca de usuários",
-      "item": [
-        {
-          "name": "Buscar donos pelo nome",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/restaurant-owners?name=Silva",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "restaurant-owners"
-              ],
-              "query": [
-                {
-                  "key": "name",
-                  "value": "Silva"
-                }
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Encontra o dono cadastrado neste run\", function () {",
-                  "    const encontrados = pm.response.json();",
-                  "    pm.expect(encontrados).to.be.an(\"array\").that.is.not.empty;",
-                  "    pm.expect(encontrados.map(u => u.id)).to.include(pm.collectionVariables.get(\"owner_id\"));",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Buscar clientes pelo nome",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/customers?name=Oliveira",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers"
-              ],
-              "query": [
-                {
-                  "key": "name",
-                  "value": "Oliveira"
-                }
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Encontra o cliente cadastrado neste run\", function () {",
-                  "    const encontrados = pm.response.json();",
-                  "    pm.expect(encontrados.map(u => u.id)).to.include(pm.collectionVariables.get(\"customer_id\"));",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Buscar usuários pelo nome (busca unificada)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/users?name={{run_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "users"
-              ],
-              "query": [
-                {
-                  "key": "name",
-                  "value": "{{run_id}}"
-                }
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Traz os dois tipos de usuário na mesma consulta\", function () {",
-                  "    const tipos = pm.response.json().map(u => u.userType);",
-                  "    pm.expect(tipos).to.include(\"RESTAURANT_OWNER\");",
-                  "    pm.expect(tipos).to.include(\"CUSTOMER\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Busca sem filtro devolve todos os usuários",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/users",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "users"
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Devolve uma lista\", function () {",
-                  "    pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty;",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Buscar dono por id",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/restaurant-owners/{{owner_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "restaurant-owners",
-                "{{owner_id}}"
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"É o dono esperado\", function () {",
-                  "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"owner_id\"));",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Buscar cliente por id",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/customers/{{customer_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "{{customer_id}}"
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"É o cliente esperado\", function () {",
-                  "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"customer_id\"));",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Busca por id inexistente (404)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/customers/99999999",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "99999999"
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 404\", function () {",
-                  "    pm.response.to.have.status(404);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(404);",
-                  "    pm.expect(problem.title).to.include(\"Não Encontrado\");",
-                  "});"
-                ]
-              }
-            }
-          ]
+     "name": "Login recusado: senha incorreta (401)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/auth/login",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "auth",
+        "login"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"login\": \"{{owner_login}}\",\n  \"password\": \"senhaErrada\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
         }
-      ]
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 401\", function () {",
+         "    pm.response.to.have.status(401);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(401);",
+         "    pm.expect(problem.title).to.include(\"Credenciais\");",
+         "});",
+         "",
+         "pm.test(\"Não revela se o problema foi o login ou a senha\", function () {",
+         "    pm.expect(pm.response.json().detail).to.include(\"Login ou senha inválidos\");",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "name": "4. Atualização de dados",
-      "item": [
-        {
-          "name": "Atualizar dados do dono (200)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/restaurant-owners/{{owner_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "restaurant-owners",
-                "{{owner_id}}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"João P. Silva {{run_id}}\",\n  \"email\": \"{{owner_email}}\",\n  \"login\": \"{{owner_login}}\",\n  \"restaurantName\": \"Restaurante Premium do João\",\n  \"cnpj\": \"{{owner_cnpj}}\",\n  \"address\": {\n    \"street\": \"Av. Paulista\",\n    \"number\": \"2000\",\n    \"complement\": \"Andar 10\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01310-100\"\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "const owner = pm.response.json();",
-                  "",
-                  "pm.test(\"Aplica os novos dados\", function () {",
-                  "    pm.expect(owner.name).to.include(\"João P. Silva\");",
-                  "    pm.expect(owner.restaurantName).to.eql(\"Restaurante Premium do João\");",
-                  "    pm.expect(owner.address.number).to.eql(\"2000\");",
-                  "});",
-                  "",
-                  "pm.test(\"Este endpoint não mexe na senha\", function () {",
-                  "    pm.expect(owner).to.not.have.property(\"password\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Atualizar dados do cliente sem enviar endereço (200)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers/{{customer_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "{{customer_id}}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Maria A. Oliveira {{run_id}}\",\n  \"email\": \"{{customer_email}}\",\n  \"login\": \"{{customer_login}}\",\n  \"cpf\": \"{{customer_cpf}}\",\n  \"dateOfBirth\": \"1995-07-15\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Endereço omitido é preservado, não apagado\", function () {",
-                  "    const customer = pm.response.json();",
-                  "    pm.expect(customer.name).to.include(\"Maria A. Oliveira\");",
-                  "    pm.expect(customer.address).to.not.eql(null);",
-                  "    pm.expect(customer.address.city).to.eql(\"Rio de Janeiro\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Atualização recusada: usuário inexistente (404)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers/99999999",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "99999999"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Fulano de Tal\",\n  \"email\": \"fulano.{{run_id}}@email.com\",\n  \"login\": \"fulano.{{run_id}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 404\", function () {",
-                  "    pm.response.to.have.status(404);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(404);",
-                  "    pm.expect(problem.title).to.include(\"Não Encontrado\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Atualização recusada: e-mail de outro usuário (409)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers/{{customer_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "{{customer_id}}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Maria Oliveira\",\n  \"email\": \"{{owner_email}}\",\n  \"login\": \"{{customer_login}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 409\", function () {",
-                  "    pm.response.to.have.status(409);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(409);",
-                  "    pm.expect(problem.title).to.include(\"E-mail\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Atualização recusada: e-mail em formato inválido (400)",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers/{{customer_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "{{customer_id}}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Maria Oliveira\",\n  \"email\": \"sem-arroba\",\n  \"login\": \"{{customer_login}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(400);",
-                  "    pm.expect(problem.title).to.include(\"Validação\");",
-                  "});"
-                ]
-              }
-            }
-          ]
+     "name": "Login recusado: login inexistente (401)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/auth/login",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "auth",
+        "login"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"login\": \"ninguem.aqui.{{run_id}}\",\n  \"password\": \"Senha@123\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
         }
-      ]
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 401\", function () {",
+         "    pm.response.to.have.status(401);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(401);",
+         "    pm.expect(problem.title).to.include(\"Credenciais\");",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "name": "5. Troca de senha",
-      "item": [
-        {
-          "name": "Troca recusada: senha atual incorreta (422)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers/{{customer_id}}/password",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "{{customer_id}}",
-                "password"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"currentPassword\": \"senhaErrada\",\n  \"newPassword\": \"NovaSenha@789\",\n  \"confirmNewPassword\": \"NovaSenha@789\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 422\", function () {",
-                  "    pm.response.to.have.status(422);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(422);",
-                  "    pm.expect(problem.title).to.include(\"Senha\");",
-                  "});",
-                  "",
-                  "pm.test(\"Explica que a senha atual não confere\", function () {",
-                  "    pm.expect(pm.response.json().detail).to.include(\"senha atual\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Troca recusada: confirmação divergente (422)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers/{{customer_id}}/password",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "{{customer_id}}",
-                "password"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"currentPassword\": \"Senha@456\",\n  \"newPassword\": \"NovaSenha@789\",\n  \"confirmNewPassword\": \"OutraCoisa@000\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 422\", function () {",
-                  "    pm.response.to.have.status(422);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(422);",
-                  "    pm.expect(problem.title).to.include(\"Senha\");",
-                  "});",
-                  "",
-                  "pm.test(\"Explica que a confirmação não confere\", function () {",
-                  "    pm.expect(pm.response.json().detail).to.include(\"confirmação\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Troca recusada: nova senha curta demais (400)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers/{{customer_id}}/password",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "{{customer_id}}",
-                "password"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"currentPassword\": \"Senha@456\",\n  \"newPassword\": \"123\",\n  \"confirmNewPassword\": \"123\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(400);",
-                  "    pm.expect(problem.title).to.include(\"Validação\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Trocar a senha do cliente (204)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/customers/{{customer_id}}/password",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "{{customer_id}}",
-                "password"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"currentPassword\": \"Senha@456\",\n  \"newPassword\": \"NovaSenha@789\",\n  \"confirmNewPassword\": \"NovaSenha@789\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 204 No Content\", function () {",
-                  "    pm.response.to.have.status(204);",
-                  "});",
-                  "",
-                  "pm.test(\"Responde sem corpo\", function () {",
-                  "    pm.expect(pm.response.text()).to.be.empty;",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Login com a senha antiga agora falha (401)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"login\": \"{{customer_login}}\",\n  \"password\": \"Senha@456\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 401\", function () {",
-                  "    pm.response.to.have.status(401);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(401);",
-                  "    pm.expect(problem.title).to.include(\"Credenciais\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Login com a senha nova funciona (200)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"login\": \"{{customer_login}}\",\n  \"password\": \"NovaSenha@789\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 200 OK\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"A troca de senha valeu de fato\", function () {",
-                  "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"customer_id\"));",
-                  "});"
-                ]
-              }
-            }
-          ]
+     "name": "Login recusado: campos vazios (400)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/auth/login",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "auth",
+        "login"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"login\": \"\",\n  \"password\": \"\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
         }
-      ]
-    },
-    {
-      "name": "6. Exclusão",
-      "item": [
-        {
-          "name": "Excluir cliente (204)",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/customers/{{customer_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "{{customer_id}}"
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 204 No Content\", function () {",
-                  "    pm.response.to.have.status(204);",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Excluir dono de restaurante (204)",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/restaurant-owners/{{owner_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "restaurant-owners",
-                "{{owner_id}}"
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 204 No Content\", function () {",
-                  "    pm.response.to.have.status(204);",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Usuário excluído não é mais encontrado (404)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/users/{{customer_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "users",
-                "{{customer_id}}"
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 404\", function () {",
-                  "    pm.response.to.have.status(404);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(404);",
-                  "    pm.expect(problem.title).to.include(\"Não Encontrado\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Exclusão recusada: usuário inexistente (404)",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/customers/99999999",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "customers",
-                "99999999"
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status 404\", function () {",
-                  "    pm.response.to.have.status(404);",
-                  "});",
-                  "",
-                  "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
-                  "    pm.response.to.have.header(\"Content-Type\");",
-                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
-                  "    const problem = pm.response.json();",
-                  "    pm.expect(problem).to.have.property(\"type\");",
-                  "    pm.expect(problem).to.have.property(\"title\");",
-                  "    pm.expect(problem).to.have.property(\"detail\");",
-                  "    pm.expect(problem.status).to.eql(404);",
-                  "    pm.expect(problem.title).to.include(\"Não Encontrado\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        }
-      ]
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 400\", function () {",
+         "    pm.response.to.have.status(400);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(400);",
+         "    pm.expect(problem.title).to.include(\"Validação\");",
+         "});"
+        ]
+       }
+      }
+     ]
     }
-  ],
-  "variable": [
+   ]
+  },
+  {
+   "name": "3. Busca de usuários",
+   "item": [
     {
-      "key": "base_url",
-      "value": "http://localhost:8080/api/v1",
-      "type": "string"
+     "name": "Buscar donos pelo nome",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurant-owners?name=Silva&page=0&size=50",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurant-owners"
+       ],
+       "query": [
+        {
+         "key": "name",
+         "value": "Silva"
+        },
+        {
+         "key": "page",
+         "value": "0"
+        },
+        {
+         "key": "size",
+         "value": "50"
+        }
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Resposta é um envelope de página\", function () {",
+         "    const body = pm.response.json();",
+         "    pm.expect(body).to.have.property(\"content\").that.is.an(\"array\");",
+         "    pm.expect(body).to.have.property(\"totalElements\");",
+         "    pm.expect(body).to.have.property(\"totalPages\");",
+         "    pm.expect(body).to.have.property(\"last\");",
+         "});",
+         "",
+         "pm.test(\"Encontra o dono cadastrado neste run\", function () {",
+         "    const encontrados = pm.response.json().content;",
+         "    pm.expect(encontrados).to.be.an(\"array\").that.is.not.empty;",
+         "    pm.expect(encontrados.map(u => u.id)).to.include(pm.collectionVariables.get(\"owner_id\"));",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "key": "run_id",
-      "value": "",
-      "type": "string"
+     "name": "Buscar clientes pelo nome",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/customers?name=Oliveira&page=0&size=50",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers"
+       ],
+       "query": [
+        {
+         "key": "name",
+         "value": "Oliveira"
+        },
+        {
+         "key": "page",
+         "value": "0"
+        },
+        {
+         "key": "size",
+         "value": "50"
+        }
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Encontra o cliente cadastrado neste run\", function () {",
+         "    const encontrados = pm.response.json().content;",
+         "    pm.expect(encontrados.map(u => u.id)).to.include(pm.collectionVariables.get(\"customer_id\"));",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "key": "owner_id",
-      "value": "",
-      "type": "string"
+     "name": "Buscar usuários pelo nome (busca unificada)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/users?name={{run_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users"
+       ],
+       "query": [
+        {
+         "key": "name",
+         "value": "{{run_id}}"
+        }
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Traz os dois tipos de usuário na mesma consulta\", function () {",
+         "    const tipos = pm.response.json().content.map(u => u.userType);",
+         "    pm.expect(tipos).to.include(\"RESTAURANT_OWNER\");",
+         "    pm.expect(tipos).to.include(\"CUSTOMER\");",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "key": "customer_id",
-      "value": "",
-      "type": "string"
+     "name": "Busca sem filtro devolve todos os usuários",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/users",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Devolve um envelope de página não vazio\", function () {",
+         "    const body = pm.response.json();",
+         "    pm.expect(body.content).to.be.an(\"array\").that.is.not.empty;",
+         "    pm.expect(body.size).to.be.a(\"number\");",
+         "    pm.expect(body.totalElements).to.be.a(\"number\");",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "key": "owner_name",
-      "value": "",
-      "type": "string"
+     "name": "Busca paginada: page e size limitam a página",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/users?page=0&size=1&sort=name,asc",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users"
+       ],
+       "query": [
+        {
+         "key": "page",
+         "value": "0"
+        },
+        {
+         "key": "size",
+         "value": "1"
+        },
+        {
+         "key": "sort",
+         "value": "name,asc"
+        }
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"size=1 devolve no máximo 1 item e os metadados coerentes\", function () {",
+         "    const body = pm.response.json();",
+         "    pm.expect(body.content.length).to.be.at.most(1);",
+         "    pm.expect(body.size).to.eql(1);",
+         "    pm.expect(body.page).to.eql(0);",
+         "    pm.expect(body.totalElements).to.be.at.least(body.content.length);",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "key": "owner_email",
-      "value": "",
-      "type": "string"
+     "name": "Buscar dono por id",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurant-owners/{{owner_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurant-owners",
+        "{{owner_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"É o dono esperado\", function () {",
+         "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"owner_id\"));",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "key": "owner_login",
-      "value": "",
-      "type": "string"
+     "name": "Buscar cliente por id",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/customers/{{customer_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "{{customer_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"É o cliente esperado\", function () {",
+         "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"customer_id\"));",
+         "});"
+        ]
+       }
+      }
+     ]
     },
     {
-      "key": "owner_cnpj",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "customer_name",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "customer_email",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "customer_login",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "customer_cpf",
-      "value": "",
-      "type": "string"
+     "name": "Busca por id inexistente (404)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/customers/99999999",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "99999999"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(404);",
+         "    pm.expect(problem.title).to.include(\"Não Encontrado\");",
+         "});"
+        ]
+       }
+      }
+     ]
     }
-  ]
+   ]
+  },
+  {
+   "name": "4. Atualização de dados",
+   "item": [
+    {
+     "name": "Atualizar dados do dono (200)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurant-owners/{{owner_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurant-owners",
+        "{{owner_id}}"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"João P. Silva {{run_id}}\",\n  \"email\": \"{{owner_email}}\",\n  \"login\": \"{{owner_login}}\",\n  \"restaurantName\": \"Restaurante Premium do João\",\n  \"cnpj\": \"{{owner_cnpj}}\",\n  \"address\": {\n    \"street\": \"Av. Paulista\",\n    \"number\": \"2000\",\n    \"complement\": \"Andar 10\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01310-100\"\n  }\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "const owner = pm.response.json();",
+         "",
+         "pm.test(\"Aplica os novos dados\", function () {",
+         "    pm.expect(owner.name).to.include(\"João P. Silva\");",
+         "    pm.expect(owner.restaurantName).to.eql(\"Restaurante Premium do João\");",
+         "    pm.expect(owner.address.number).to.eql(\"2000\");",
+         "});",
+         "",
+         "pm.test(\"Este endpoint não mexe na senha\", function () {",
+         "    pm.expect(owner).to.not.have.property(\"password\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Atualizar dados do cliente sem enviar endereço (200)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers/{{customer_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "{{customer_id}}"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Maria A. Oliveira {{run_id}}\",\n  \"email\": \"{{customer_email}}\",\n  \"login\": \"{{customer_login}}\",\n  \"cpf\": \"{{customer_cpf}}\",\n  \"dateOfBirth\": \"1995-07-15\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Endereço omitido é preservado, não apagado\", function () {",
+         "    const customer = pm.response.json();",
+         "    pm.expect(customer.name).to.include(\"Maria A. Oliveira\");",
+         "    pm.expect(customer.address).to.not.eql(null);",
+         "    pm.expect(customer.address.city).to.eql(\"Rio de Janeiro\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Atualização recusada: usuário inexistente (404)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers/99999999",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "99999999"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Fulano de Tal\",\n  \"email\": \"fulano.{{run_id}}@email.com\",\n  \"login\": \"fulano.{{run_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(404);",
+         "    pm.expect(problem.title).to.include(\"Não Encontrado\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Atualização recusada: e-mail de outro usuário (409)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers/{{customer_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "{{customer_id}}"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Maria Oliveira\",\n  \"email\": \"{{owner_email}}\",\n  \"login\": \"{{customer_login}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(409);",
+         "    pm.expect(problem.title).to.include(\"E-mail\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Atualização recusada: e-mail em formato inválido (400)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers/{{customer_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "{{customer_id}}"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Maria Oliveira\",\n  \"email\": \"sem-arroba\",\n  \"login\": \"{{customer_login}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 400\", function () {",
+         "    pm.response.to.have.status(400);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(400);",
+         "    pm.expect(problem.title).to.include(\"Validação\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "5. Troca de senha",
+   "item": [
+    {
+     "name": "Troca recusada: senha atual incorreta (422)",
+     "request": {
+      "method": "PATCH",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers/{{customer_id}}/password",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "{{customer_id}}",
+        "password"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"currentPassword\": \"senhaErrada\",\n  \"newPassword\": \"NovaSenha@789\",\n  \"confirmNewPassword\": \"NovaSenha@789\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 422\", function () {",
+         "    pm.response.to.have.status(422);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(422);",
+         "    pm.expect(problem.title).to.include(\"Senha\");",
+         "});",
+         "",
+         "pm.test(\"Explica que a senha atual não confere\", function () {",
+         "    pm.expect(pm.response.json().detail).to.include(\"senha atual\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Troca recusada: confirmação divergente (422)",
+     "request": {
+      "method": "PATCH",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers/{{customer_id}}/password",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "{{customer_id}}",
+        "password"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"currentPassword\": \"Senha@456\",\n  \"newPassword\": \"NovaSenha@789\",\n  \"confirmNewPassword\": \"OutraCoisa@000\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 422\", function () {",
+         "    pm.response.to.have.status(422);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(422);",
+         "    pm.expect(problem.title).to.include(\"Senha\");",
+         "});",
+         "",
+         "pm.test(\"Explica que a confirmação não confere\", function () {",
+         "    pm.expect(pm.response.json().detail).to.include(\"confirmação\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Troca recusada: nova senha curta demais (400)",
+     "request": {
+      "method": "PATCH",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers/{{customer_id}}/password",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "{{customer_id}}",
+        "password"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"currentPassword\": \"Senha@456\",\n  \"newPassword\": \"123\",\n  \"confirmNewPassword\": \"123\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 400\", function () {",
+         "    pm.response.to.have.status(400);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(400);",
+         "    pm.expect(problem.title).to.include(\"Validação\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Trocar a senha do cliente (204)",
+     "request": {
+      "method": "PATCH",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/customers/{{customer_id}}/password",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "{{customer_id}}",
+        "password"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"currentPassword\": \"Senha@456\",\n  \"newPassword\": \"NovaSenha@789\",\n  \"confirmNewPassword\": \"NovaSenha@789\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 204 No Content\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});",
+         "",
+         "pm.test(\"Responde sem corpo\", function () {",
+         "    pm.expect(pm.response.text()).to.be.empty;",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Login com a senha antiga agora falha (401)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/auth/login",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "auth",
+        "login"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"login\": \"{{customer_login}}\",\n  \"password\": \"Senha@456\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 401\", function () {",
+         "    pm.response.to.have.status(401);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(401);",
+         "    pm.expect(problem.title).to.include(\"Credenciais\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Login com a senha nova funciona (200)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/auth/login",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "auth",
+        "login"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"login\": \"{{customer_login}}\",\n  \"password\": \"NovaSenha@789\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"A troca de senha valeu de fato\", function () {",
+         "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"customer_id\"));",
+         "});"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "6. Exclusão",
+   "item": [
+    {
+     "name": "Excluir cliente (204)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/customers/{{customer_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "{{customer_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 204 No Content\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Excluir dono de restaurante (204)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurant-owners/{{owner_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurant-owners",
+        "{{owner_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 204 No Content\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Usuário excluído não é mais encontrado (404)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/users/{{customer_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "{{customer_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(404);",
+         "    pm.expect(problem.title).to.include(\"Não Encontrado\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Exclusão recusada: usuário inexistente (404)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/customers/99999999",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "customers",
+        "99999999"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Corpo segue o formato ProblemDetail (RFC 7807)\", function () {",
+         "    pm.response.to.have.header(\"Content-Type\");",
+         "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+         "    const problem = pm.response.json();",
+         "    pm.expect(problem).to.have.property(\"type\");",
+         "    pm.expect(problem).to.have.property(\"title\");",
+         "    pm.expect(problem).to.have.property(\"detail\");",
+         "    pm.expect(problem.status).to.eql(404);",
+         "    pm.expect(problem.title).to.include(\"Não Encontrado\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "variable": [
+  {
+   "key": "base_url",
+   "value": "http://localhost:8080/api/v1",
+   "type": "string"
+  },
+  {
+   "key": "run_id",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "owner_id",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "customer_id",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "owner_name",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "owner_email",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "owner_login",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "owner_cnpj",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "customer_name",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "customer_email",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "customer_login",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "customer_cpf",
+   "value": "",
+   "type": "string"
+  }
+ ]
 }

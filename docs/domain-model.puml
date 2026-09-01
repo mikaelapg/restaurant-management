@@ -1,0 +1,59 @@
+@startuml domain-model
+' Modelo de domínio — Sistema de Gestão de Restaurantes (Fase 1)
+' Renderizar:  plantuml docs/domain-model.puml        (gera docs/domain-model.png)
+'   ou:        docker run --rm -v "$PWD":/work plantuml/plantuml -tpng /work/docs/domain-model.puml
+
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #FDFDFD
+  BorderColor #333333
+  ArrowColor #333333
+}
+hide circle
+
+abstract class User <<abstract>> {
+  +id : Long  <<PK>>
+  +name : String
+  +email : String  <<unique>>
+  +login : String  <<unique>>
+  --
+  #password : String  (hash BCrypt)
+  +lastModifiedAt : LocalDateTime
+  +userType : UserType  <<discriminador>>
+}
+
+class Customer {
+  +cpf : String  <<unique, opcional>>
+  +dateOfBirth : LocalDate  <<opcional>>
+}
+
+class RestaurantOwner {
+  +restaurantName : String
+  +cnpj : String  <<unique, opcional>>
+}
+
+class Address <<value object / @Embeddable>> {
+  +street : String
+  +number : String
+  +complement : String
+  +city : String
+  +state : String
+  +zipCode : String
+}
+
+enum UserType {
+  RESTAURANT_OWNER
+  CUSTOMER
+}
+
+User <|-- Customer : herança JOINED\n(PK = FK, 1:1)
+User <|-- RestaurantOwner : herança JOINED\n(PK = FK, 1:1)
+User *-- "1" Address : composição\n(colunas da tabela users)
+User ..> UserType : discriminador
+
+note bottom of User
+  Tabela base: users (colunas comuns + endereço embutido).
+  Tabelas filhas: customers, restaurant_owners
+  (FK para users, ON DELETE CASCADE).
+end note
+@enduml

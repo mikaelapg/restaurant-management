@@ -1,0 +1,41 @@
+%% Modelo de domínio — Sistema de Gestão de Restaurantes (Fase 1)
+%% Renderizar:  mmdc -i docs/domain-model.mmd -o docs/domain-model.png
+%% ou colar em https://mermaid.live
+classDiagram
+    class User {
+        <<abstract>>
+        +Long id
+        +String name
+        +String email  «unique»
+        +String login  «unique»
+        #String password  «hash BCrypt»
+        +LocalDateTime lastModifiedAt
+        +UserType userType  «discriminador»
+    }
+    class Customer {
+        +String cpf  «unique, opcional»
+        +LocalDate dateOfBirth  «opcional»
+    }
+    class RestaurantOwner {
+        +String restaurantName
+        +String cnpj  «unique, opcional»
+    }
+    class Address {
+        <<value object / @Embeddable>>
+        +String street
+        +String number
+        +String complement
+        +String city
+        +String state
+        +String zipCode
+    }
+    class UserType {
+        <<enumeration>>
+        RESTAURANT_OWNER
+        CUSTOMER
+    }
+
+    User <|-- Customer : JOINED (PK = FK, 1:1)
+    User <|-- RestaurantOwner : JOINED (PK = FK, 1:1)
+    User "1" *-- "1" Address : composição (colunas de users)
+    User ..> UserType : discriminador

@@ -8,6 +8,11 @@ endpoint dedicado.
 Construída em Java 21 e Spring Boot 3.3, com persistência em PostgreSQL versionada por
 Flyway e empacotamento em Docker.
 
+**Repositório:** <https://github.com/mikaelapg/restaurant-management>
+O repositório contém o código-fonte, este README, a documentação Swagger/OpenAPI (servida
+pela aplicação) e a coleção Postman em JSON. O relatório técnico em PDF é entregue
+separadamente, como pede o enunciado.
+
 ## Stack
 
 | Componente | Versão | Papel |
@@ -20,7 +25,9 @@ Flyway e empacotamento em Docker.
 | SpringDoc OpenAPI | 2.6.0 | Especificação OpenAPI e Swagger UI |
 | spring-security-crypto | 6.x | Hash BCrypt das senhas |
 | Lombok | 1.18.x | Redução de boilerplate |
-| JUnit 5 + Mockito | 5.x | Testes automatizados |
+| JUnit 5 + Mockito | 5.x | Testes unitários |
+| Testcontainers | 1.20.x | Testes de integração contra PostgreSQL real |
+| JaCoCo | 0.8.x | Cobertura de código |
 | Docker Compose | v2 | Orquestração de aplicação e banco |
 
 ## Decisões de projeto
@@ -56,9 +63,15 @@ a senha atual e a confirmação da nova, em `PATCH .../password`. São operaçõ
 pré-condições e riscos distintos, e mantê-las juntas obrigaria o cliente a trafegar a senha
 em toda edição de perfil.
 
-**Camada de serviço com regras comuns em classe base.** `BaseUserService` concentra o que
-vale para qualquer usuário — unicidade de e-mail e login, troca de senha e exclusão — e os
-serviços concretos tratam apenas o que é específico do subtipo.
+**Camada de serviço orientada a SOLID.** Os serviços são expostos por interface
+(`CustomerService`, `RestaurantOwnerService`, `UserService`, `AuthService`), e os
+controllers e testes dependem da abstração, não da implementação (`…ServiceImpl` —
+Inversão de Dependência). `BaseUserService` orquestra o que vale para qualquer usuário —
+troca de senha e exclusão —; a regra de unicidade de e-mail e login fica no colaborador
+`UserUniquenessValidator` (Responsabilidade Única); e um novo perfil de usuário se
+resolve por uma nova subclasse, sem tocar no código existente (Aberto/Fechado). Os
+serviços concretos tratam apenas o que é específico do subtipo (CPF, CNPJ, nome do
+restaurante).
 
 **Senhas com BCrypt, sem a stack de filtros do Spring Security.** O escopo desta fase é a
 validação de credenciais, não a proteção das rotas. Usar apenas `spring-security-crypto`
@@ -120,7 +133,7 @@ Com a aplicação no ar:
 | Método | Caminho | Descrição |
 |---|---|---|
 | POST | `/api/v1/customers` | Cadastra |
-| GET | `/api/v1/customers` | Lista, com filtro opcional `?name=` |
+| GET | `/api/v1/customers` | Lista paginada (`page`, `size`, `sort`), com filtro opcional `?name=` |
 | GET | `/api/v1/customers/{id}` | Busca por id |
 | PUT | `/api/v1/customers/{id}` | Atualiza dados cadastrais |
 | PATCH | `/api/v1/customers/{id}/password` | Troca a senha |
@@ -131,7 +144,7 @@ Com a aplicação no ar:
 | Método | Caminho | Descrição |
 |---|---|---|
 | POST | `/api/v1/restaurant-owners` | Cadastra |
-| GET | `/api/v1/restaurant-owners` | Lista, com filtro opcional `?name=` |
+| GET | `/api/v1/restaurant-owners` | Lista paginada (`page`, `size`, `sort`), com filtro opcional `?name=` |
 | GET | `/api/v1/restaurant-owners/{id}` | Busca por id |
 | PUT | `/api/v1/restaurant-owners/{id}` | Atualiza dados cadastrais |
 | PATCH | `/api/v1/restaurant-owners/{id}/password` | Troca a senha |
@@ -141,11 +154,26 @@ Com a aplicação no ar:
 
 | Método | Caminho | Descrição |
 |---|---|---|
-| GET | `/api/v1/users` | Lista clientes e donos juntos, com filtro `?name=` |
+| GET | `/api/v1/users` | Lista paginada de clientes e donos juntos, com filtro `?name=` |
 | GET | `/api/v1/users/{id}` | Busca qualquer usuário por id |
 
 A consulta unificada atende à busca por nome sem exigir que o consumidor saiba de antemão
 se o usuário é cliente ou dono.
+
+### Paginação
+
+Os três endpoints `GET` de listagem (`/customers`, `/restaurant-owners`, `/users`) são
+paginados com o suporte padrão do Spring Data. Parâmetros de consulta:
+
+| Parâmetro | Padrão | Observação |
+|---|---|---|
+| `page` | `0` | Índice da página, base zero |
+| `size` | `20` | Itens por página; máximo `100` |
+| `sort` | — | Campo e direção, ex.: `sort=name,asc` (repetível) |
+
+A resposta é um envelope: `content` (a página de itens) mais os metadados `page`, `size`,
+`totalElements`, `totalPages` e `last`. O filtro `?name=` é combinável com a paginação.
+A busca por `id` não é paginada.
 
 ## Regras de validação e unicidade
 
@@ -154,14 +182,22 @@ se o usuário é cliente ou dono.
 | `name` | Obrigatório, de 2 a 255 caracteres |
 | `email` | Obrigatório, formato válido, único entre todos os usuários, normalizado para minúsculas |
 | `login` | Obrigatório, de 3 a 100 caracteres, único independente de maiúsculas e minúsculas |
-| `password` | Obrigatório, mínimo de 6 caracteres, armazenado como hash BCrypt |
+| `password` | Obrigatório, mínimo de 8 caracteres com minúscula, maiúscula, dígito e caractere especial (sem espaços); regra em `@StrongPassword`; armazenado como hash BCrypt (custo 12) |
 | `cpf` | Opcional; quando informado, formato `000.000.000-00` e único |
 | `cnpj` | Opcional; quando informado, formato `00.000.000/0000-00` e único |
 | `dateOfBirth` | Opcional; quando informada, deve estar no passado |
 
-E-mail e login são únicos no conjunto de todos os usuários, não por subtipo: um cliente e
-um dono não podem compartilhar o mesmo login. O login é tratado como identificador único
-independente da caixa, tanto no cadastro quanto na autenticação.
+**E-mail e login são identificadores únicos e independentes.** O enunciado exige unicidade
+apenas do e-mail; o login foi mantido também único, de forma independente, porque é a
+credencial consumida pelo serviço de validação de login e precisa identificar um único
+usuário sem ambiguidade. O e-mail é o canal de contato/recuperação e pode mudar sem afetar
+o acesso; o login é o identificador estável de autenticação. Ambos são únicos no conjunto
+de todos os usuários, não por subtipo, e comparados sem diferenciar a caixa.
+
+**CPF e CNPJ são opcionais** porque não estão na lista de campos obrigatórios do enunciado
+(nome, e-mail, login, senha, data da última alteração e endereço) — são enriquecimento dos
+subtipos. Quando informados, seguem o formato esperado e têm unicidade garantida no banco
+e verificada no serviço (resposta `409` apontando o campo).
 
 Na atualização, o endereço ausente no corpo significa manter o atual, não apagá-lo.
 
@@ -218,16 +254,28 @@ diferenciar maiúsculas de minúsculas.
 ## Testes
 
 ```bash
-./mvnw test
+./mvnw test      # 70 testes unitários (JUnit 5 + Mockito)
+./mvnw verify    # + testes de integração com Testcontainers (exige Docker)
 ```
 
-67 testes cobrindo:
+**70 testes unitários** cobrindo:
 
 - Serviços, com Mockito: `AuthServiceTest`, `CustomerServiceTest`,
-  `RestaurantOwnerServiceTest`, `UserServiceTest`
+  `RestaurantOwnerServiceTest`, `UserServiceTest` — regras de negócio, unicidade delegada a
+  `UserUniquenessValidator` e paginação
 - Camada web, com `@WebMvcTest`: `AuthControllerTest`, `CustomerControllerTest`,
-  `RestaurantOwnerControllerTest`, `UserControllerTest`
+  `RestaurantOwnerControllerTest`, `UserControllerTest` — rotas, status, envelope de página
+  e corpo de erro RFC 7807
 - Tratamento de erros: `GlobalExceptionHandlerTest`, `UnhandledExceptionHandlerTest`
+
+**Teste de integração** (`SchemaConstraintsIT`, sufixo `IT` → roda em `mvn verify` pelo
+maven-failsafe-plugin): sobe um PostgreSQL real com Testcontainers e valida que a migration
+`V1` do Flyway cria o schema e que as constraints de unicidade (`email`, `login`, `cpf`,
+`cnpj`) são impostas pelo banco. Sem Docker disponível, a classe é ignorada sem quebrar o
+build.
+
+**Cobertura** pelo JaCoCo (relatório em `target/site/jacoco/index.html` após `mvn test`):
+~83% das instruções e ~81% das linhas na suíte unitária.
 
 ## Coleção Postman
 
@@ -254,8 +302,10 @@ src/main/java/com/restaurant/management
 │   ├── model       Entidades JPA e o embeddable Address
 │   └── repository  Repositórios Spring Data
 ├── dto
-│   ├── request     Payloads de entrada com Bean Validation
-│   └── response    Payloads de saída, sem senha
+│   ├── request            Payloads de entrada com Bean Validation
+│   │   └── validation     @StrongPassword e seu validador
+│   └── response           Payloads de saída (sem senha) e PageResponse
 ├── exception       Exceções de negócio e tratadores RFC 7807
-└── service         Regras de negócio
+└── service         Interfaces de serviço, implementações (…ServiceImpl),
+                    BaseUserService e UserUniquenessValidator
 ```
