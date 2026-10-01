@@ -1,5 +1,8 @@
 package com.restaurant.management.exception;
 
+import com.restaurant.management.core.application.exception.UserTypeAlreadyExistsException;
+import com.restaurant.management.core.application.exception.UserTypeNotFoundException;
+import com.restaurant.management.core.domain.exception.DomainValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -87,6 +90,16 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    /** Trata dados que quebram uma regra de uma entidade de domínio. */
+    @ExceptionHandler(DomainValidationException.class)
+    public ProblemDetail handleDomainValidation(DomainValidationException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problem.setTitle("Regra de Domínio Violada");
+        problem.setType(URI.create("https://restaurant-api.com/errors/domain-validation"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
     // ===========================
     // 401 Unauthorized
     // ===========================
@@ -115,6 +128,15 @@ public class GlobalExceptionHandler {
         );
         problem.setTitle("Usuário Não Encontrado");
         problem.setType(URI.create("https://restaurant-api.com/errors/user-not-found"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(UserTypeNotFoundException.class)
+    public ProblemDetail handleUserTypeNotFound(UserTypeNotFoundException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setTitle("Tipo de Usuário Não Encontrado");
+        problem.setType(URI.create("https://restaurant-api.com/errors/user-type-not-found"));
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }
@@ -195,6 +217,15 @@ public class GlobalExceptionHandler {
         );
         problem.setTitle("CNPJ Já Cadastrado");
         problem.setType(URI.create("https://restaurant-api.com/errors/cnpj-conflict"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(UserTypeAlreadyExistsException.class)
+    public ProblemDetail handleUserTypeAlreadyExists(UserTypeAlreadyExistsException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Tipo de Usuário Já Cadastrado");
+        problem.setType(URI.create("https://restaurant-api.com/errors/user-type-conflict"));
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }
