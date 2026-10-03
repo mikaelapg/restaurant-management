@@ -2,6 +2,9 @@ package com.restaurant.management.core.application.usertype;
 
 import com.restaurant.management.core.application.exception.UserTypeAlreadyExistsException;
 import com.restaurant.management.core.application.exception.UserTypeNotFoundException;
+import com.restaurant.management.core.application.exception.UserNotFoundException;
+import com.restaurant.management.core.application.exception.UserTypeInUseException;
+import com.restaurant.management.core.application.user.UserGateway;
 import com.restaurant.management.core.domain.usertype.UserType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,6 +36,9 @@ class UserTypeUseCasesTest {
 
     @Mock
     private UserTypeGateway gateway;
+
+    @Mock
+    private UserGateway userGateway;
 
     private static UserType saved(Long id, String name) {
         return UserType.restore(id, name);
@@ -165,7 +171,7 @@ class UserTypeUseCasesTest {
         void shouldDelete() {
             when(gateway.findById(1L)).thenReturn(Optional.of(saved(1L, "Cliente")));
 
-            new DeleteUserTypeUseCase(gateway).execute(1L);
+            new DeleteUserTypeUseCase(gateway, userGateway).execute(1L);
 
             verify(gateway).deleteById(1L);
         }
@@ -175,9 +181,57 @@ class UserTypeUseCasesTest {
         void shouldThrowWhenMissing() {
             when(gateway.findById(99L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> new DeleteUserTypeUseCase(gateway).execute(99L))
+            assertThatThrownBy(() -> new DeleteUserTypeUseCase(gateway, userGateway).execute(99L))
                     .isInstanceOf(UserTypeNotFoundException.class);
             verify(gateway, never()).deleteById(any());
+        }
+
+        @Test
+        @DisplayName("recusa excluir um tipo associado a algum usuário")
+        void shouldRefuseWhenInUse() {
+            when(gateway.findById(1L)).thenReturn(Optional.of(saved(1L, "Cliente")));
+            when(userGateway.existsByUserTypeId(1L)).thenReturn(true);
+
+            assertThatThrownBy(() -> new DeleteUserTypeUseCase(gateway, userGateway).execute(1L))
+                    .isInstanceOf(UserTypeInUseException.class);
+            verify(gateway, never()).deleteById(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Associar a um usuário")
+    class Assign {
+
+        @Test
+        @DisplayName("associa quando usuário e tipo existem")
+        void shouldAssign() {
+            when(userGateway.existsById(10L)).thenReturn(true);
+            when(gateway.findById(1L)).thenReturn(Optional.of(saved(1L, "Cliente")));
+
+            new AssignUserTypeUseCase(userGateway, gateway).execute(10L, 1L);
+
+            verify(userGateway).assignUserType(10L, 1L);
+        }
+
+        @Test
+        @DisplayName("lança usuário não encontrado e não associa nada")
+        void shouldThrowWhenUserIsMissing() {
+            when(userGateway.existsById(10L)).thenReturn(false);
+
+            assertThatThrownBy(() -> new AssignUserTypeUseCase(userGateway, gateway).execute(10L, 1L))
+                    .isInstanceOf(UserNotFoundException.class);
+            verify(userGateway, never()).assignUserType(any(), any());
+        }
+
+        @Test
+        @DisplayName("lança tipo não encontrado e não associa nada")
+        void shouldThrowWhenUserTypeIsMissing() {
+            when(userGateway.existsById(10L)).thenReturn(true);
+            when(gateway.findById(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> new AssignUserTypeUseCase(userGateway, gateway).execute(10L, 99L))
+                    .isInstanceOf(UserTypeNotFoundException.class);
+            verify(userGateway, never()).assignUserType(any(), any());
         }
     }
 }

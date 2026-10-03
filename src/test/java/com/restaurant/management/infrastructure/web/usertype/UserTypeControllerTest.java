@@ -1,6 +1,7 @@
 package com.restaurant.management.infrastructure.web.usertype;
 
 import com.restaurant.management.core.application.exception.UserTypeAlreadyExistsException;
+import com.restaurant.management.core.application.exception.UserTypeInUseException;
 import com.restaurant.management.core.application.exception.UserTypeNotFoundException;
 import com.restaurant.management.core.application.usertype.CreateUserTypeUseCase;
 import com.restaurant.management.core.application.usertype.DeleteUserTypeUseCase;
@@ -163,5 +164,14 @@ class UserTypeControllerTest {
 
         mockMvc.perform(delete(BASE + "/99"))
                 .andExpect(status().isNotFound());
+    }
+    @Test
+    @DisplayName("DELETE /{id} de tipo em uso responde 409")
+    void shouldReturnConflictWhenInUse() throws Exception {
+        doThrow(new UserTypeInUseException(1L)).when(deleteUserType).execute(1L);
+
+        mockMvc.perform(delete(BASE + "/1"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-type-in-use"));
     }
 }

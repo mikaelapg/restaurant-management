@@ -1,6 +1,8 @@
 package com.restaurant.management.exception;
 
+import com.restaurant.management.core.application.exception.UserNotFoundException;
 import com.restaurant.management.core.application.exception.UserTypeAlreadyExistsException;
+import com.restaurant.management.core.application.exception.UserTypeInUseException;
 import com.restaurant.management.core.application.exception.UserTypeNotFoundException;
 import com.restaurant.management.core.domain.exception.DomainValidationException;
 import lombok.extern.slf4j.Slf4j;
@@ -120,6 +122,7 @@ public class GlobalExceptionHandler {
     // 404 Not Found
     // ===========================
 
+    /** Responde também à exceção homônima da Fase 1, que herda desta. */
     @ExceptionHandler(UserNotFoundException.class)
     public ProblemDetail handleUserNotFound(UserNotFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -226,6 +229,15 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problem.setTitle("Tipo de Usuário Já Cadastrado");
         problem.setType(URI.create("https://restaurant-api.com/errors/user-type-conflict"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(UserTypeInUseException.class)
+    public ProblemDetail handleUserTypeInUse(UserTypeInUseException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Tipo de Usuário em Uso");
+        problem.setType(URI.create("https://restaurant-api.com/errors/user-type-in-use"));
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }

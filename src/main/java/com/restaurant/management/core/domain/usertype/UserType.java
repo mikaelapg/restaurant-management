@@ -19,6 +19,12 @@ public final class UserType {
     /** Tamanho máximo do nome, espelhado na coluna {@code user_types.name}. */
     public static final int NAME_MAX_LENGTH = 50;
 
+    /** Tipo atribuído a quem se cadastra como dono de restaurante. Criado pela migration V3. */
+    public static final String RESTAURANT_OWNER = "Dono de Restaurante";
+
+    /** Tipo atribuído a quem se cadastra como cliente. Criado pela migration V3. */
+    public static final String CUSTOMER = "Cliente";
+
     private final Long id;
     private final String name;
 

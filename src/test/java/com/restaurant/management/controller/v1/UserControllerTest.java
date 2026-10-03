@@ -5,6 +5,7 @@ import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.dto.response.UserResponse;
 import com.restaurant.management.exception.UserNotFoundException;
 import com.restaurant.management.service.UserService;
+import com.restaurant.management.infrastructure.web.usertype.UserTypeResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,12 +45,14 @@ class UserControllerTest {
 
     private UserResponse owner() {
         return new UserResponse(1L, UserType.RESTAURANT_OWNER, "João Silva",
-                "joao@restaurante.com", "joao.silva", LocalDateTime.of(2025, 8, 24, 21, 0), null);
+                "joao@restaurante.com", "joao.silva", LocalDateTime.of(2025, 8, 24, 21, 0), null,
+                new UserTypeResponse(1L, "Dono de Restaurante"));
     }
 
     private UserResponse customer() {
         return new UserResponse(2L, UserType.CUSTOMER, "Maria Silva",
-                "maria@email.com", "maria.silva", LocalDateTime.of(2025, 8, 24, 21, 5), null);
+                "maria@email.com", "maria.silva", LocalDateTime.of(2025, 8, 24, 21, 5), null,
+                new UserTypeResponse(2L, "Cliente"));
     }
 
     private PageResponse<UserResponse> pageOf(UserResponse... items) {
@@ -66,7 +69,9 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content[0].userType").value("RESTAURANT_OWNER"))
-                .andExpect(jsonPath("$.content[1].userType").value("CUSTOMER"));
+                .andExpect(jsonPath("$.content[1].userType").value("CUSTOMER"))
+                .andExpect(jsonPath("$.content[0].assignedUserType.name").value("Dono de Restaurante"))
+                .andExpect(jsonPath("$.content[1].assignedUserType.name").value("Cliente"));
 
         verify(userService).findAll(eq(null), any(Pageable.class));
     }

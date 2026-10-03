@@ -11,6 +11,8 @@ import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.dto.response.RestaurantOwnerResponse;
 import com.restaurant.management.exception.CnpjAlreadyExistsException;
 import com.restaurant.management.exception.LoginAlreadyExistsException;
+import com.restaurant.management.core.application.usertype.UserTypeGateway;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,6 +47,9 @@ class RestaurantOwnerServiceTest {
 
     @Mock
     private BCryptPasswordEncoder passwordEncoder;
+
+    @Mock
+    private UserTypeGateway userTypeGateway;
 
     @InjectMocks
     private RestaurantOwnerServiceImpl ownerService;
@@ -81,6 +86,38 @@ class RestaurantOwnerServiceTest {
     @Nested
     @DisplayName("Criação de Dono de Restaurante")
     class CreateTests {
+
+        @Test
+        @DisplayName("Deve associar o tipo de usuário \"Dono de Restaurante\" ao cadastrar")
+        void shouldAssignDefaultUserType_WhenCreating() {
+            when(userTypeGateway.findByNameIgnoreCase(com.restaurant.management.core.domain.usertype.UserType.RESTAURANT_OWNER))
+                    .thenReturn(Optional.of(com.restaurant.management.core.domain.usertype.UserType.restore(7L, "Dono de Restaurante")));
+            when(restaurantOwnerRepository.save(any(RestaurantOwner.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            var response = ownerService.create(new CreateRestaurantOwnerRequest(
+                    "Carlos Eduardo", "carlos@bistro.com", "carlos.eduardo", "Senha@123",
+                    null, "Bistrô Francês", null
+            ));
+
+            ArgumentCaptor<RestaurantOwner> captor = ArgumentCaptor.forClass(RestaurantOwner.class);
+            verify(restaurantOwnerRepository).save(captor.capture());
+            assertThat(captor.getValue().getAssignedUserType().getId()).isEqualTo(7L);
+            assertThat(response.assignedUserType().name()).isEqualTo("Dono de Restaurante");
+        }
+
+        @Test
+        @DisplayName("Deve cadastrar sem tipo de usuário quando o tipo padrão não existir mais")
+        void shouldCreateWithoutUserType_WhenDefaultIsMissing() {
+            when(userTypeGateway.findByNameIgnoreCase(any())).thenReturn(Optional.empty());
+            when(restaurantOwnerRepository.save(any(RestaurantOwner.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            var response = ownerService.create(new CreateRestaurantOwnerRequest(
+                    "Carlos Eduardo", "carlos@bistro.com", "carlos.eduardo", "Senha@123",
+                    null, "Bistrô Francês", null
+            ));
+
+            assertThat(response.assignedUserType()).isNull();
+        }
 
         @Test
         @DisplayName("Deve cadastrar dono de restaurante com sucesso")

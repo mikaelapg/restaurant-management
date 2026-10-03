@@ -45,7 +45,8 @@ public class UserServiceImpl implements UserService {
                 user.getEmail(),
                 user.getLogin(),
                 user.getLastModifiedAt(),
-                AddressMapper.toResponse(user.getAddress())
+                AddressMapper.toResponse(user.getAddress()),
+                UserTypeMapper.toResponse(user.getAssignedUserType())
         );
     }
 }

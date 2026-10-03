@@ -95,12 +95,12 @@ class SchemaConstraintsIT {
     }
 
     @Test
-    @DisplayName("A migração V1 do Flyway foi aplicada com sucesso e criou as tabelas do domínio")
+    @DisplayName("Todas as migrações do Flyway foram aplicadas e criaram as tabelas do domínio")
     void flywayMigrationIsApplied() {
         MigrationInfo current = flyway.info().current();
         assertThat(current).isNotNull();
-        assertThat(current.getVersion().getVersion()).isEqualTo("1");
         assertThat(current.getState().isApplied()).isTrue();
+        assertThat(flyway.info().pending()).isEmpty();
 
         assertThat(tableExists("users")).isTrue();
         assertThat(tableExists("customers")).isTrue();

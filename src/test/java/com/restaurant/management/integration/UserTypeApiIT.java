@@ -1,8 +1,9 @@
 package com.restaurant.management.integration;
 
+import com.restaurant.management.domain.repository.UserRepository;
 import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaEntity;
 import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaRepository;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,8 +61,17 @@ class UserTypeApiIT {
     @Autowired
     private UserTypeJpaRepository repository;
 
-    @AfterEach
+    @Autowired
+    private UserRepository userRepository;
+
+    /**
+     * Antes de cada teste, e não depois: a migration V3 já cadastra "Dono de Restaurante"
+     * e "Cliente", e os testes partem de uma tabela vazia. Os usuários saem primeiro
+     * porque a FK impede excluir um tipo em uso.
+     */
+    @BeforeEach
     void cleanUp() {
+        userRepository.deleteAll();
         repository.deleteAll();
     }
 
@@ -115,5 +125,36 @@ class UserTypeApiIT {
 
         assertThatThrownBy(() -> repository.saveAndFlush(new UserTypeJpaEntity(null, "cliente")))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("associação: cliente nasce com o tipo Cliente, troca de tipo e tipo em uso não pode ser excluído")
+    void shouldAssociateUsersWithUserTypes() throws Exception {
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("Cliente")))
+                .andExpect(status().isCreated());
+        Long clienteId = repository.findByNameIgnoreCase("Cliente").orElseThrow().getId();
+
+        mockMvc.perform(post("/api/v1/customers").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"name": "Maria", "email": "maria@it.com", "login": "maria.it", "password": "Senha@123"}
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.assignedUserType.id").value(clienteId))
+                .andExpect(jsonPath("$.assignedUserType.name").value("Cliente"));
+        Long userId = userRepository.findByLoginIgnoreCase("maria.it").orElseThrow().getId();
+
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("Cliente VIP")))
+                .andExpect(status().isCreated());
+        Long vipId = repository.findByNameIgnoreCase("Cliente VIP").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/v1/users/" + userId + "/user-type")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"userTypeId\": " + vipId + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedUserType.name").value("Cliente VIP"));
+
+        mockMvc.perform(delete(BASE + "/" + vipId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-type-in-use"));
+        mockMvc.perform(delete(BASE + "/" + clienteId))
+                .andExpect(status().isNoContent());
     }
 }

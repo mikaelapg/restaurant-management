@@ -1,6 +1,7 @@
 package com.restaurant.management.dto.response;
 
 import com.restaurant.management.domain.enums.UserType;
+import com.restaurant.management.infrastructure.web.usertype.UserTypeResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -38,6 +39,9 @@ public record CustomerResponse(
         String cpf,
 
         @Schema(description = "Data de nascimento", example = "1995-07-15", type = "string")
-        LocalDate dateOfBirth
+        LocalDate dateOfBirth,
+
+        @Schema(description = "Tipo de usuário associado (cadastro de tipos); nulo se não houver")
+        UserTypeResponse assignedUserType
 ) {
 }

@@ -1,5 +1,7 @@
 package com.restaurant.management.infrastructure.config;
 
+import com.restaurant.management.core.application.user.UserGateway;
+import com.restaurant.management.core.application.usertype.AssignUserTypeUseCase;
 import com.restaurant.management.core.application.usertype.CreateUserTypeUseCase;
 import com.restaurant.management.core.application.usertype.DeleteUserTypeUseCase;
 import com.restaurant.management.core.application.usertype.FindUserTypeByIdUseCase;
@@ -40,7 +42,12 @@ public class UserTypeConfig {
     }
 
     @Bean
-    public DeleteUserTypeUseCase deleteUserTypeUseCase(UserTypeGateway gateway) {
-        return new DeleteUserTypeUseCase(gateway);
+    public DeleteUserTypeUseCase deleteUserTypeUseCase(UserTypeGateway gateway, UserGateway userGateway) {
+        return new DeleteUserTypeUseCase(gateway, userGateway);
+    }
+
+    @Bean
+    public AssignUserTypeUseCase assignUserTypeUseCase(UserGateway userGateway, UserTypeGateway userTypeGateway) {
+        return new AssignUserTypeUseCase(userGateway, userTypeGateway);
     }
 }

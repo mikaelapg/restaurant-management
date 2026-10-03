@@ -1,5 +1,7 @@
 package com.restaurant.management.service;
 
+import com.restaurant.management.core.application.usertype.UserTypeGateway;
+import com.restaurant.management.core.domain.usertype.UserType;
 import com.restaurant.management.domain.model.RestaurantOwner;
 import com.restaurant.management.domain.repository.RestaurantOwnerRepository;
 import com.restaurant.management.dto.request.CreateRestaurantOwnerRequest;
@@ -26,8 +28,9 @@ public class RestaurantOwnerServiceImpl extends BaseUserService<RestaurantOwner>
 
     public RestaurantOwnerServiceImpl(RestaurantOwnerRepository restaurantOwnerRepository,
                                       UserUniquenessValidator uniquenessValidator,
-                                      BCryptPasswordEncoder passwordEncoder) {
-        super(restaurantOwnerRepository, uniquenessValidator, passwordEncoder);
+                                      BCryptPasswordEncoder passwordEncoder,
+                                      UserTypeGateway userTypeGateway) {
+        super(restaurantOwnerRepository, uniquenessValidator, passwordEncoder, userTypeGateway);
         this.restaurantOwnerRepository = restaurantOwnerRepository;
     }
 
@@ -64,6 +67,7 @@ public class RestaurantOwnerServiceImpl extends BaseUserService<RestaurantOwner>
                 .login(request.login())
                 .password(passwordEncoder.encode(request.password()))
                 .address(AddressMapper.toEntity(request.address()))
+                .assignedUserType(defaultUserType(UserType.RESTAURANT_OWNER))
                 .restaurantName(request.restaurantName())
                 .cnpj(request.cnpj())
                 .build();
@@ -130,7 +134,8 @@ public class RestaurantOwnerServiceImpl extends BaseUserService<RestaurantOwner>
                 owner.getLastModifiedAt(),
                 AddressMapper.toResponse(owner.getAddress()),
                 owner.getRestaurantName(),
-                owner.getCnpj()
+                owner.getCnpj(),
+                UserTypeMapper.toResponse(owner.getAssignedUserType())
         );
     }
 }

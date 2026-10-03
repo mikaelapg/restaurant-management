@@ -9,6 +9,7 @@ import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.dto.response.RestaurantOwnerResponse;
 import com.restaurant.management.exception.UserNotFoundException;
 import com.restaurant.management.service.RestaurantOwnerService;
+import com.restaurant.management.infrastructure.web.usertype.UserTypeResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,7 +62,8 @@ class RestaurantOwnerControllerTest {
                 LocalDateTime.of(2025, 8, 24, 21, 0),
                 new AddressResponse("Av. Paulista", "1000", "Conjunto 50", "São Paulo", "SP", "01310-100"),
                 "Restaurante do João",
-                "12.345.678/0001-90"
+                "12.345.678/0001-90",
+                new UserTypeResponse(1L, "Dono de Restaurante")
         );
     }
 

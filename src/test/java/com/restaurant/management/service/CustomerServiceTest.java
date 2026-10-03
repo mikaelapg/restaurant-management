@@ -15,6 +15,8 @@ import com.restaurant.management.exception.EmailAlreadyExistsException;
 import com.restaurant.management.exception.InvalidPasswordException;
 import com.restaurant.management.exception.LoginAlreadyExistsException;
 import com.restaurant.management.exception.UserNotFoundException;
+import com.restaurant.management.core.application.usertype.UserTypeGateway;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -51,6 +53,9 @@ class CustomerServiceTest {
     @Mock
     private BCryptPasswordEncoder passwordEncoder;
 
+    @Mock
+    private UserTypeGateway userTypeGateway;
+
     @InjectMocks
     private CustomerServiceImpl customerService;
 
@@ -86,6 +91,38 @@ class CustomerServiceTest {
     @Nested
     @DisplayName("Criação de Cliente")
     class CreateTests {
+
+        @Test
+        @DisplayName("Deve associar o tipo de usuário \"Cliente\" ao cadastrar")
+        void shouldAssignDefaultUserType_WhenCreating() {
+            when(userTypeGateway.findByNameIgnoreCase(com.restaurant.management.core.domain.usertype.UserType.CUSTOMER))
+                    .thenReturn(Optional.of(com.restaurant.management.core.domain.usertype.UserType.restore(7L, "Cliente")));
+            when(customerRepository.save(any(Customer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            var response = customerService.create(new CreateCustomerRequest(
+                    "Maria Silva", "maria@email.com", "maria.silva", "Senha@123",
+                    null, null, null
+            ));
+
+            ArgumentCaptor<Customer> captor = ArgumentCaptor.forClass(Customer.class);
+            verify(customerRepository).save(captor.capture());
+            assertThat(captor.getValue().getAssignedUserType().getId()).isEqualTo(7L);
+            assertThat(response.assignedUserType().name()).isEqualTo("Cliente");
+        }
+
+        @Test
+        @DisplayName("Deve cadastrar sem tipo de usuário quando o tipo padrão não existir mais")
+        void shouldCreateWithoutUserType_WhenDefaultIsMissing() {
+            when(userTypeGateway.findByNameIgnoreCase(any())).thenReturn(Optional.empty());
+            when(customerRepository.save(any(Customer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            var response = customerService.create(new CreateCustomerRequest(
+                    "Maria Silva", "maria@email.com", "maria.silva", "Senha@123",
+                    null, null, null
+            ));
+
+            assertThat(response.assignedUserType()).isNull();
+        }
 
         @Test
         @DisplayName("Deve cadastrar cliente com sucesso quando dados forem válidos")

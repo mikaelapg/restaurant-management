@@ -1,6 +1,7 @@
 package com.restaurant.management.domain.model;
 
 import com.restaurant.management.domain.enums.UserType;
+import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -74,4 +75,14 @@ public abstract class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "user_type", insertable = false, updatable = false)
     private UserType userType;
+
+    /**
+     * Tipo de usuário associado, do cadastro de tipos da Fase 2 (tabela {@code user_types}).
+     * <p>
+     * Diferente de {@link #userType}: aquele é o discriminador da herança e diz em qual
+     * tabela filha estão os dados; este é o tipo gerenciado pelo CRUD e pode ser trocado.
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "user_type_id")
+    private UserTypeJpaEntity assignedUserType;
 }

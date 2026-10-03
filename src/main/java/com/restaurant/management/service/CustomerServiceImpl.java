@@ -1,5 +1,7 @@
 package com.restaurant.management.service;
 
+import com.restaurant.management.core.application.usertype.UserTypeGateway;
+import com.restaurant.management.core.domain.usertype.UserType;
 import com.restaurant.management.domain.model.Customer;
 import com.restaurant.management.domain.repository.CustomerRepository;
 import com.restaurant.management.dto.request.CreateCustomerRequest;
@@ -26,8 +28,9 @@ public class CustomerServiceImpl extends BaseUserService<Customer> implements Cu
 
     public CustomerServiceImpl(CustomerRepository customerRepository,
                                UserUniquenessValidator uniquenessValidator,
-                               BCryptPasswordEncoder passwordEncoder) {
-        super(customerRepository, uniquenessValidator, passwordEncoder);
+                               BCryptPasswordEncoder passwordEncoder,
+                               UserTypeGateway userTypeGateway) {
+        super(customerRepository, uniquenessValidator, passwordEncoder, userTypeGateway);
         this.customerRepository = customerRepository;
     }
 
@@ -64,6 +67,7 @@ public class CustomerServiceImpl extends BaseUserService<Customer> implements Cu
                 .login(request.login())
                 .password(passwordEncoder.encode(request.password()))
                 .address(AddressMapper.toEntity(request.address()))
+                .assignedUserType(defaultUserType(UserType.CUSTOMER))
                 .cpf(request.cpf())
                 .dateOfBirth(request.dateOfBirth())
                 .build();
@@ -130,7 +134,8 @@ public class CustomerServiceImpl extends BaseUserService<Customer> implements Cu
                 customer.getLastModifiedAt(),
                 AddressMapper.toResponse(customer.getAddress()),
                 customer.getCpf(),
-                customer.getDateOfBirth()
+                customer.getDateOfBirth(),
+                UserTypeMapper.toResponse(customer.getAssignedUserType())
         );
     }
 }

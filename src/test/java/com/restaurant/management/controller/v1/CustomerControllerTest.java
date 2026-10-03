@@ -13,6 +13,7 @@ import com.restaurant.management.exception.EmailAlreadyExistsException;
 import com.restaurant.management.exception.InvalidPasswordException;
 import com.restaurant.management.exception.UserNotFoundException;
 import com.restaurant.management.service.CustomerService;
+import com.restaurant.management.infrastructure.web.usertype.UserTypeResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,7 +71,8 @@ class CustomerControllerTest {
                 LocalDateTime.of(2025, 8, 24, 21, 0),
                 new AddressResponse("Rua das Flores", "123", "Apto 45", "São Paulo", "SP", "01001-000"),
                 "123.456.789-00",
-                LocalDate.of(1995, 7, 15)
+                LocalDate.of(1995, 7, 15),
+                new UserTypeResponse(2L, "Cliente")
         );
     }
 

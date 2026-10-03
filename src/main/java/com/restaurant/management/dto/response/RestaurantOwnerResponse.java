@@ -1,6 +1,7 @@
 package com.restaurant.management.dto.response;
 
 import com.restaurant.management.domain.enums.UserType;
+import com.restaurant.management.infrastructure.web.usertype.UserTypeResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -37,6 +38,9 @@ public record RestaurantOwnerResponse(
         String restaurantName,
 
         @Schema(description = "CNPJ do restaurante", example = "12.345.678/0001-90")
-        String cnpj
+        String cnpj,
+
+        @Schema(description = "Tipo de usuário associado (cadastro de tipos); nulo se não houver")
+        UserTypeResponse assignedUserType
 ) {
 }

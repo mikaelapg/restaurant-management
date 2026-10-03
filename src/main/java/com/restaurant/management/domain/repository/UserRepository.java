@@ -25,4 +25,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     /** Busca paginada por trecho do nome, ignorando maiúsculas e minúsculas. */
     Page<User> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    /** Indica se algum usuário está associado ao tipo de usuário informado. */
+    boolean existsByAssignedUserTypeId(Long userTypeId);
 }

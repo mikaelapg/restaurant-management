@@ -1,10 +1,12 @@
 package com.restaurant.management.service;
 
+import com.restaurant.management.core.application.usertype.UserTypeGateway;
 import com.restaurant.management.domain.model.User;
 import com.restaurant.management.domain.repository.UserBaseRepository;
 import com.restaurant.management.dto.request.ChangePasswordRequest;
 import com.restaurant.management.exception.InvalidPasswordException;
 import com.restaurant.management.exception.UserNotFoundException;
+import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,13 +29,16 @@ public abstract class BaseUserService<T extends User> {
     protected final UserBaseRepository<T> repository;
     protected final UserUniquenessValidator uniquenessValidator;
     protected final BCryptPasswordEncoder passwordEncoder;
+    protected final UserTypeGateway userTypeGateway;
 
     protected BaseUserService(UserBaseRepository<T> repository,
                               UserUniquenessValidator uniquenessValidator,
-                              BCryptPasswordEncoder passwordEncoder) {
+                              BCryptPasswordEncoder passwordEncoder,
+                              UserTypeGateway userTypeGateway) {
         this.repository = repository;
         this.uniquenessValidator = uniquenessValidator;
         this.passwordEncoder = passwordEncoder;
+        this.userTypeGateway = userTypeGateway;
     }
 
     /**
@@ -60,6 +65,17 @@ public abstract class BaseUserService<T extends User> {
     public void delete(Long id) {
         repository.delete(findOrThrow(id));
         log.info("Usuário {} excluído", id);
+    }
+
+    /**
+     * Tipo de usuário atribuído a um cadastro novo, procurado pelo nome.
+     * Se o tipo tiver sido renomeado ou excluído, o usuário nasce sem tipo e pode ser
+     * associado depois, em {@code PUT /api/v1/users/{id}/user-type}.
+     */
+    protected UserTypeJpaEntity defaultUserType(String name) {
+        return userTypeGateway.findByNameIgnoreCase(name)
+                .map(UserTypeJpaEntity::fromDomain)
+                .orElse(null);
     }
 
     protected T findOrThrow(Long id) {
