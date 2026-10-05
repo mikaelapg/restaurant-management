@@ -15,6 +15,8 @@ import com.restaurant.management.exception.EmailAlreadyExistsException;
 import com.restaurant.management.exception.InvalidPasswordException;
 import com.restaurant.management.exception.LoginAlreadyExistsException;
 import com.restaurant.management.exception.UserNotFoundException;
+import com.restaurant.management.core.application.exception.UserOwnsRestaurantsException;
+import com.restaurant.management.core.application.restaurant.RestaurantGateway;
 import com.restaurant.management.core.application.usertype.UserTypeGateway;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +57,9 @@ class CustomerServiceTest {
 
     @Mock
     private UserTypeGateway userTypeGateway;
+
+    @Mock
+    private RestaurantGateway restaurantGateway;
 
     @InjectMocks
     private CustomerServiceImpl customerService;
@@ -355,6 +360,17 @@ class CustomerServiceTest {
             customerService.delete(1L);
 
             verify(customerRepository).delete(sampleCustomer);
+        }
+
+        @Test
+        @DisplayName("Deve recusar excluir cliente que é dono de restaurantes")
+        void shouldRefuseDelete_WhenUserOwnsRestaurants() {
+            when(customerRepository.findById(1L)).thenReturn(Optional.of(sampleCustomer));
+            when(restaurantGateway.existsByOwnerId(1L)).thenReturn(true);
+
+            assertThatThrownBy(() -> customerService.delete(1L))
+                    .isInstanceOf(UserOwnsRestaurantsException.class);
+            verify(customerRepository, never()).delete(any());
         }
     }
 }

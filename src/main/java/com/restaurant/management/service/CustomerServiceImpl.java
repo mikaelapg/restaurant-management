@@ -1,5 +1,6 @@
 package com.restaurant.management.service;
 
+import com.restaurant.management.core.application.restaurant.RestaurantGateway;
 import com.restaurant.management.core.application.usertype.UserTypeGateway;
 import com.restaurant.management.core.domain.usertype.UserType;
 import com.restaurant.management.domain.model.Customer;
@@ -29,8 +30,9 @@ public class CustomerServiceImpl extends BaseUserService<Customer> implements Cu
     public CustomerServiceImpl(CustomerRepository customerRepository,
                                UserUniquenessValidator uniquenessValidator,
                                BCryptPasswordEncoder passwordEncoder,
-                               UserTypeGateway userTypeGateway) {
-        super(customerRepository, uniquenessValidator, passwordEncoder, userTypeGateway);
+                               UserTypeGateway userTypeGateway,
+                               RestaurantGateway restaurantGateway) {
+        super(customerRepository, uniquenessValidator, passwordEncoder, userTypeGateway, restaurantGateway);
         this.customerRepository = customerRepository;
     }
 

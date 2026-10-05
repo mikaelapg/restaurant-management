@@ -1,6 +1,8 @@
 package com.restaurant.management.exception;
 
+import com.restaurant.management.core.application.exception.RestaurantNotFoundException;
 import com.restaurant.management.core.application.exception.UserNotFoundException;
+import com.restaurant.management.core.application.exception.UserOwnsRestaurantsException;
 import com.restaurant.management.core.application.exception.UserTypeAlreadyExistsException;
 import com.restaurant.management.core.application.exception.UserTypeInUseException;
 import com.restaurant.management.core.application.exception.UserTypeNotFoundException;
@@ -144,6 +146,15 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(RestaurantNotFoundException.class)
+    public ProblemDetail handleRestaurantNotFound(RestaurantNotFoundException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setTitle("Restaurante Não Encontrado");
+        problem.setType(URI.create("https://restaurant-api.com/errors/restaurant-not-found"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ProblemDetail handleNoResourceFound(NoResourceFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -238,6 +249,15 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problem.setTitle("Tipo de Usuário em Uso");
         problem.setType(URI.create("https://restaurant-api.com/errors/user-type-in-use"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(UserOwnsRestaurantsException.class)
+    public ProblemDetail handleUserOwnsRestaurants(UserOwnsRestaurantsException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Usuário É Dono de Restaurantes");
+        problem.setType(URI.create("https://restaurant-api.com/errors/user-owns-restaurants"));
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }

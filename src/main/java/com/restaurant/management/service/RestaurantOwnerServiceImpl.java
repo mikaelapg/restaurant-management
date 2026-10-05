@@ -1,5 +1,6 @@
 package com.restaurant.management.service;
 
+import com.restaurant.management.core.application.restaurant.RestaurantGateway;
 import com.restaurant.management.core.application.usertype.UserTypeGateway;
 import com.restaurant.management.core.domain.usertype.UserType;
 import com.restaurant.management.domain.model.RestaurantOwner;
@@ -29,8 +30,9 @@ public class RestaurantOwnerServiceImpl extends BaseUserService<RestaurantOwner>
     public RestaurantOwnerServiceImpl(RestaurantOwnerRepository restaurantOwnerRepository,
                                       UserUniquenessValidator uniquenessValidator,
                                       BCryptPasswordEncoder passwordEncoder,
-                                      UserTypeGateway userTypeGateway) {
-        super(restaurantOwnerRepository, uniquenessValidator, passwordEncoder, userTypeGateway);
+                                      UserTypeGateway userTypeGateway,
+                                      RestaurantGateway restaurantGateway) {
+        super(restaurantOwnerRepository, uniquenessValidator, passwordEncoder, userTypeGateway, restaurantGateway);
         this.restaurantOwnerRepository = restaurantOwnerRepository;
     }
 

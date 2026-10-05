@@ -1,5 +1,6 @@
 package com.restaurant.management.dto.response;
 
+import com.restaurant.management.core.application.pagination.PageResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.data.domain.Page;
 
@@ -43,6 +44,18 @@ public record PageResponse<T>(
                 page.getSize(),
                 page.getTotalElements(),
                 page.getTotalPages(),
+                page.isLast()
+        );
+    }
+
+    /** Converte uma página da camada de aplicação em um {@code PageResponse} de DTOs. */
+    public static <E, D> PageResponse<D> of(PageResult<E> page, Function<E, D> mapper) {
+        return new PageResponse<>(
+                page.content().stream().map(mapper).toList(),
+                page.page(),
+                page.size(),
+                page.totalElements(),
+                page.totalPages(),
                 page.isLast()
         );
     }

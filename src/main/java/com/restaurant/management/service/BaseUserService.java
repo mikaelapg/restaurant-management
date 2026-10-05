@@ -1,5 +1,7 @@
 package com.restaurant.management.service;
 
+import com.restaurant.management.core.application.exception.UserOwnsRestaurantsException;
+import com.restaurant.management.core.application.restaurant.RestaurantGateway;
 import com.restaurant.management.core.application.usertype.UserTypeGateway;
 import com.restaurant.management.domain.model.User;
 import com.restaurant.management.domain.repository.UserBaseRepository;
@@ -30,15 +32,18 @@ public abstract class BaseUserService<T extends User> {
     protected final UserUniquenessValidator uniquenessValidator;
     protected final BCryptPasswordEncoder passwordEncoder;
     protected final UserTypeGateway userTypeGateway;
+    protected final RestaurantGateway restaurantGateway;
 
     protected BaseUserService(UserBaseRepository<T> repository,
                               UserUniquenessValidator uniquenessValidator,
                               BCryptPasswordEncoder passwordEncoder,
-                              UserTypeGateway userTypeGateway) {
+                              UserTypeGateway userTypeGateway,
+                              RestaurantGateway restaurantGateway) {
         this.repository = repository;
         this.uniquenessValidator = uniquenessValidator;
         this.passwordEncoder = passwordEncoder;
         this.userTypeGateway = userTypeGateway;
+        this.restaurantGateway = restaurantGateway;
     }
 
     /**
@@ -61,9 +66,18 @@ public abstract class BaseUserService<T extends User> {
         log.info("Senha alterada para o usuário {}", id);
     }
 
+    /**
+     * Exclui o usuário. Quem é dono de restaurante não pode ser excluído: a FK do banco
+     * recusaria de qualquer forma, e a checagem aqui troca o erro genérico de integridade
+     * por uma mensagem que diz o que fazer.
+     */
     @Transactional
     public void delete(Long id) {
-        repository.delete(findOrThrow(id));
+        T user = findOrThrow(id);
+        if (restaurantGateway.existsByOwnerId(id)) {
+            throw new UserOwnsRestaurantsException(id);
+        }
+        repository.delete(user);
         log.info("Usuário {} excluído", id);
     }
 

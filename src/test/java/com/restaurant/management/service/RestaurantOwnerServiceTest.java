@@ -11,6 +11,8 @@ import com.restaurant.management.dto.response.PageResponse;
 import com.restaurant.management.dto.response.RestaurantOwnerResponse;
 import com.restaurant.management.exception.CnpjAlreadyExistsException;
 import com.restaurant.management.exception.LoginAlreadyExistsException;
+import com.restaurant.management.core.application.exception.UserOwnsRestaurantsException;
+import com.restaurant.management.core.application.restaurant.RestaurantGateway;
 import com.restaurant.management.core.application.usertype.UserTypeGateway;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +52,9 @@ class RestaurantOwnerServiceTest {
 
     @Mock
     private UserTypeGateway userTypeGateway;
+
+    @Mock
+    private RestaurantGateway restaurantGateway;
 
     @InjectMocks
     private RestaurantOwnerServiceImpl ownerService;
@@ -238,6 +243,17 @@ class RestaurantOwnerServiceTest {
             ownerService.delete(1L);
 
             verify(restaurantOwnerRepository).delete(sampleOwner);
+        }
+
+        @Test
+        @DisplayName("Deve recusar excluir dono que é dono de restaurantes")
+        void shouldRefuseDelete_WhenUserOwnsRestaurants() {
+            when(restaurantOwnerRepository.findById(1L)).thenReturn(Optional.of(sampleOwner));
+            when(restaurantGateway.existsByOwnerId(1L)).thenReturn(true);
+
+            assertThatThrownBy(() -> ownerService.delete(1L))
+                    .isInstanceOf(UserOwnsRestaurantsException.class);
+            verify(restaurantOwnerRepository, never()).delete(any());
         }
     }
 }
