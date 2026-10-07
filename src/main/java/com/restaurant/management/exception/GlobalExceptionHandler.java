@@ -1,5 +1,7 @@
 package com.restaurant.management.exception;
 
+import com.restaurant.management.core.application.exception.MenuItemAlreadyExistsException;
+import com.restaurant.management.core.application.exception.MenuItemNotFoundException;
 import com.restaurant.management.core.application.exception.RestaurantNotFoundException;
 import com.restaurant.management.core.application.exception.UserNotFoundException;
 import com.restaurant.management.core.application.exception.UserOwnsRestaurantsException;
@@ -155,6 +157,15 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(MenuItemNotFoundException.class)
+    public ProblemDetail handleMenuItemNotFound(MenuItemNotFoundException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setTitle("Item do Cardápio Não Encontrado");
+        problem.setType(URI.create("https://restaurant-api.com/errors/menu-item-not-found"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ProblemDetail handleNoResourceFound(NoResourceFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
@@ -240,6 +251,15 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problem.setTitle("Tipo de Usuário Já Cadastrado");
         problem.setType(URI.create("https://restaurant-api.com/errors/user-type-conflict"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(MenuItemAlreadyExistsException.class)
+    public ProblemDetail handleMenuItemAlreadyExists(MenuItemAlreadyExistsException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Item do Cardápio Já Cadastrado");
+        problem.setType(URI.create("https://restaurant-api.com/errors/menu-item-conflict"));
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }
