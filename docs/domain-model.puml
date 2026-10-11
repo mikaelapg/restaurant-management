@@ -1,5 +1,5 @@
 @startuml domain-model
-' Modelo de domínio — Sistema de Gestão de Restaurantes (Fase 1)
+' Modelo de domínio — Sistema de Gestão de Restaurantes (Fases 1 e 2)
 ' Renderizar:  plantuml docs/domain-model.puml        (gera docs/domain-model.png)
 '   ou:        docker run --rm -v "$PWD":/work plantuml/plantuml -tpng /work/docs/domain-model.puml
 
@@ -11,49 +11,95 @@ skinparam class {
 }
 hide circle
 
-abstract class User <<abstract>> {
-  +id : Long  <<PK>>
-  +name : String
-  +email : String  <<unique>>
-  +login : String  <<unique>>
-  --
-  #password : String  (hash BCrypt)
-  +lastModifiedAt : LocalDateTime
-  +userType : UserType  <<discriminador>>
+package "Fase 1 — usuários" {
+  abstract class User <<abstract>> {
+    +id : Long  <<PK>>
+    +name : String
+    +email : String  <<unique>>
+    +login : String  <<unique>>
+    --
+    #password : String  (hash BCrypt)
+    +lastModifiedAt : LocalDateTime
+    +userType : UserProfile  <<discriminador>>
+  }
+
+  class Customer {
+    +cpf : String  <<unique, opcional>>
+    +dateOfBirth : LocalDate  <<opcional>>
+  }
+
+  class RestaurantOwner {
+    +restaurantName : String
+    +cnpj : String  <<unique, opcional>>
+  }
+
+  enum UserProfile {
+    RESTAURANT_OWNER
+    CUSTOMER
+  }
 }
 
-class Customer {
-  +cpf : String  <<unique, opcional>>
-  +dateOfBirth : LocalDate  <<opcional>>
-}
+package "Fase 2 — core.domain" {
+  class UserType {
+    +id : Long  <<PK>>
+    +name : String  <<unique, sem diferenciar maiúsculas>>
+    --
+    +rename(newName) : UserType
+  }
 
-class RestaurantOwner {
-  +restaurantName : String
-  +cnpj : String  <<unique, opcional>>
-}
+  class Restaurant {
+    +id : Long  <<PK>>
+    +name : String
+    +cuisineType : String
+    +ownerId : Long  <<FK users>>
+    --
+    +update(...) : Restaurant
+  }
 
-class Address <<value object / @Embeddable>> {
-  +street : String
-  +number : String
-  +complement : String
-  +city : String
-  +state : String
-  +zipCode : String
-}
+  class OpeningHours <<value object>> {
+    +opensAt : LocalTime
+    +closesAt : LocalTime
+    --
+    +crossesMidnight() : boolean
+    +isOpenAt(time) : boolean
+  }
 
-enum UserType {
-  RESTAURANT_OWNER
-  CUSTOMER
+  class MenuItem {
+    +id : Long  <<PK>>
+    +restaurantId : Long  <<FK restaurants>>
+    +name : String  <<unique no restaurante>>
+    +description : String
+    +price : BigDecimal  (> 0, 2 casas)
+    +dineInOnly : boolean
+    +photoPath : String  <<opcional>>
+    --
+    +update(...) : MenuItem
+  }
+
+  class Address <<value object>> {
+    +street : String
+    +number : String
+    +complement : String
+    +city : String
+    +state : String
+    +zipCode : String
+  }
 }
 
 User <|-- Customer : herança JOINED\n(PK = FK, 1:1)
 User <|-- RestaurantOwner : herança JOINED\n(PK = FK, 1:1)
-User *-- "1" Address : composição\n(colunas da tabela users)
-User ..> UserType : discriminador
+User *-- "0..1" Address : composição\n(colunas da tabela users)
+User ..> UserProfile : discriminador
+User "0..*" --> "0..1" UserType : assignedUserType\n(FK, RESTRICT)
+Restaurant "0..*" --> "1" User : dono\n(owner_id, RESTRICT)
+Restaurant *-- "1" Address : composição
+Restaurant *-- "1" OpeningHours
+Restaurant "1" *-- "0..*" MenuItem : cardápio\n(CASCADE)
 
 note bottom of User
-  Tabela base: users (colunas comuns + endereço embutido).
+  Tabela base: users (colunas comuns + endereço embutido + user_type_id).
   Tabelas filhas: customers, restaurant_owners
   (FK para users, ON DELETE CASCADE).
+  No código, o enum UserProfile é domain.enums.UserType.
 end note
 @enduml

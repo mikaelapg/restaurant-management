@@ -46,10 +46,16 @@ public class OpenApiConfig {
                                 
                                 **Versão da API:** v1 (`/api/v1/`)
                                 
-                                **Tipos de usuário suportados:**
+                                **Perfis de usuário:**
                                 - `RESTAURANT_OWNER` — Dono de restaurante
                                 - `CUSTOMER` — Cliente
-                                
+
+                                Cada usuário também é associado a um **tipo de usuário** do cadastro
+                                `/api/v1/user-types` ("Dono de Restaurante" e "Cliente" já vêm cadastrados).
+
+                                **Fase 2:** tipos de usuário, restaurantes (`/api/v1/restaurants`) e
+                                itens do cardápio (`/api/v1/restaurants/{id}/menu-items`).
+
                                 **Autenticação:** Validação simples via endpoint `/api/v1/auth/login`.
                                 
                                 **Padrão de erros:** RFC 7807 — ProblemDetail

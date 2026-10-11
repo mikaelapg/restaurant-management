@@ -1,6 +1,8 @@
-%% Modelo de domínio — Sistema de Gestão de Restaurantes (Fase 1)
+%% Modelo de domínio — Sistema de Gestão de Restaurantes (Fases 1 e 2)
 %% Renderizar:  mmdc -i docs/domain-model.mmd -o docs/domain-model.png
 %% ou colar em https://mermaid.live
+%% UserProfile é o enum domain.enums.UserType do código; o nome muda aqui para não
+%% colidir com a entidade UserType da Fase 2 (core.domain.usertype.UserType).
 classDiagram
     class User {
         <<abstract>>
@@ -10,7 +12,7 @@ classDiagram
         +String login  «unique»
         #String password  «hash BCrypt»
         +LocalDateTime lastModifiedAt
-        +UserType userType  «discriminador»
+        +UserProfile userType  «discriminador»
     }
     class Customer {
         +String cpf  «unique, opcional»
@@ -20,8 +22,45 @@ classDiagram
         +String restaurantName
         +String cnpj  «unique, opcional»
     }
+    class UserProfile {
+        <<enumeration>>
+        RESTAURANT_OWNER
+        CUSTOMER
+    }
+    class UserType {
+        <<Fase 2>>
+        +Long id
+        +String name  «unique, sem diferenciar maiúsculas»
+        +rename(newName) UserType
+    }
+    class Restaurant {
+        <<Fase 2>>
+        +Long id
+        +String name
+        +String cuisineType
+        +Long ownerId
+        +update(...) Restaurant
+    }
+    class OpeningHours {
+        <<value object>>
+        +LocalTime opensAt
+        +LocalTime closesAt
+        +crossesMidnight() boolean
+        +isOpenAt(time) boolean
+    }
+    class MenuItem {
+        <<Fase 2>>
+        +Long id
+        +Long restaurantId
+        +String name  «unique no restaurante»
+        +String description
+        +BigDecimal price  «> 0, 2 casas»
+        +boolean dineInOnly
+        +String photoPath  «opcional»
+        +update(...) MenuItem
+    }
     class Address {
-        <<value object / @Embeddable>>
+        <<value object>>
         +String street
         +String number
         +String complement
@@ -29,13 +68,13 @@ classDiagram
         +String state
         +String zipCode
     }
-    class UserType {
-        <<enumeration>>
-        RESTAURANT_OWNER
-        CUSTOMER
-    }
 
     User <|-- Customer : JOINED (PK = FK, 1:1)
     User <|-- RestaurantOwner : JOINED (PK = FK, 1:1)
-    User "1" *-- "1" Address : composição (colunas de users)
-    User ..> UserType : discriminador
+    User "1" *-- "0..1" Address : composição (colunas de users)
+    User ..> UserProfile : discriminador
+    User "0..*" --> "0..1" UserType : assignedUserType (FK, RESTRICT)
+    Restaurant "0..*" --> "1" User : dono (owner_id, RESTRICT)
+    Restaurant "1" *-- "1" Address : composição (colunas de restaurants)
+    Restaurant "1" *-- "1" OpeningHours
+    Restaurant "1" *-- "0..*" MenuItem : cardápio (CASCADE)

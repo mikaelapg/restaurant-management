@@ -1,9 +1,11 @@
 # Sistema de Gestão de Restaurantes
 
-API REST para o sistema compartilhado de gestão de restaurantes do Tech Challenge — Fase 1.
-Implementa o cadastro e a manutenção dos dois perfis de usuário do domínio, dono de
-restaurante e cliente, com validação de credenciais, busca por nome e troca de senha em
-endpoint dedicado.
+API REST para o sistema compartilhado de gestão de restaurantes do Tech Challenge.
+
+- **Fase 1:** cadastro e manutenção dos dois perfis de usuário, dono de restaurante e
+  cliente, com validação de credenciais, busca por nome e troca de senha em endpoint dedicado.
+- **Fase 2:** cadastro de tipos de usuário e associação dos usuários a um tipo, cadastro de
+  restaurantes e cadastro dos itens do cardápio, organizados em Clean Architecture.
 
 Construída em Java 21 e Spring Boot 3.3, com persistência em PostgreSQL versionada por
 Flyway e empacotamento em Docker.
@@ -27,10 +29,110 @@ separadamente, como pede o enunciado.
 | Lombok | 1.18.x | Redução de boilerplate |
 | JUnit 5 + Mockito | 5.x | Testes unitários |
 | Testcontainers | 1.20.x | Testes de integração contra PostgreSQL real |
-| JaCoCo | 0.8.x | Cobertura de código |
+| JaCoCo | 0.8.x | Cobertura de código, com mínimo de 80% |
 | Docker Compose | v2 | Orquestração de aplicação e banco |
 
+## Arquitetura
+
+As funcionalidades da Fase 2 seguem a Clean Architecture, em três camadas. A regra é que
+as dependências apontam só para dentro: a infraestrutura conhece a aplicação, que conhece
+o domínio, e nunca o contrário.
+
+```
+            ┌───────────────────────────────────────────────────────┐
+            │ infrastructure  (Spring, JPA, HTTP)                   │
+            │   web/          controllers e DTOs                    │
+            │   persistence/  entidades JPA, repositórios, gateways │
+            │   config/       registra os casos de uso como beans   │
+            │   ┌───────────────────────────────────────────────┐   │
+            │   │ core/application  (Java puro)                 │   │
+            │   │   casos de uso, interfaces de gateway,        │   │
+            │   │   comandos, exceções, paginação               │   │
+            │   │   ┌───────────────────────────────────────┐   │   │
+            │   │   │ core/domain  (Java puro)              │   │   │
+            │   │   │   UserType, Restaurant, MenuItem,     │   │   │
+            │   │   │   Address, OpeningHours               │   │   │
+            │   │   └───────────────────────────────────────┘   │   │
+            │   └───────────────────────────────────────────────┘   │
+            └───────────────────────────────────────────────────────┘
+```
+
+| Camada | Pacote | O que tem | Depende de |
+|---|---|---|---|
+| Domínio | `core.domain` | Entidades imutáveis que validam as próprias regras (nome obrigatório, preço positivo, horários diferentes) e lançam `DomainValidationException` | nada |
+| Aplicação | `core.application` | Um caso de uso por operação (`CreateRestaurantUseCase`, `AssignUserTypeUseCase`…) e as interfaces de gateway que eles usam (`RestaurantGateway`, `UserGateway`…) | domínio |
+| Infraestrutura | `infrastructure` | Controllers REST, entidades JPA separadas das de domínio, gateways que implementam as interfaces da aplicação e classes `@Configuration` que montam os casos de uso | aplicação e domínio |
+
+Os casos de uso e as entidades de domínio não têm nenhuma anotação do Spring nem do JPA. Por
+isso são testados com JUnit e Mockito puros, sem subir contexto, e trocar o banco mudaria só
+os gateways.
+
+**O caminho de uma requisição**, cadastrando um restaurante:
+
+1. `RestaurantController` recebe o `RestaurantRequest`, que o Bean Validation confere
+   (campos ausentes viram 400 com `fieldErrors`).
+2. O request vira um `RestaurantCommand`; endereço e horário viram os objetos de valor
+   `Address` e `OpeningHours`, que validam as regras de domínio.
+3. `CreateRestaurantUseCase` cria o `Restaurant`, pergunta ao `UserGateway` se o dono
+   existe e manda o `RestaurantGateway` salvar.
+4. `RestaurantJpaGateway` converte o domínio em `RestaurantJpaEntity`, salva pelo Spring
+   Data e converte o resultado de volta.
+5. O controller devolve `201 Created` com o header `Location` e o `RestaurantResponse`.
+
+**Convivência com a Fase 1.** O cadastro de usuários da Fase 1 continua na estrutura em
+camadas tradicional (`controller`, `service`, `domain`, `dto`). Os casos de uso novos não
+dependem dele: quando precisam saber de usuários, usam a interface `UserGateway`, e o
+`UserJpaGateway` faz a ponte com o repositório existente. A migração dos usuários para a
+estrutura nova pode ser feita depois sem mexer nos casos de uso.
+
 ## Decisões de projeto
+
+### Fase 2
+
+**Tipo de usuário como cadastro, associado por chave estrangeira.** Com banco relacional, a
+associação é uma coluna `users.user_type_id` com FK para `user_types`. Cada usuário tem um
+tipo; trocar de tipo é um `PUT /api/v1/users/{id}/user-type`. A migration `V3` cadastra
+"Dono de Restaurante" e "Cliente", associa os usuários que já existiam conforme o perfil, e
+os cadastros novos nascem com o tipo correspondente. Se esses tipos forem renomeados ou
+excluídos, o usuário nasce sem tipo e pode ser associado depois, em vez de o cadastro falhar.
+
+**Tipo de usuário e perfil são coisas diferentes.** O campo `userType`
+(`CUSTOMER`/`RESTAURANT_OWNER`) da Fase 1 continua sendo o discriminador da herança: diz em
+qual tabela filha estão o CPF ou o CNPJ, e não muda. O `assignedUserType` é o tipo do
+cadastro da Fase 2, gerenciado pelo CRUD e trocável.
+
+**Integridade garantida pelo banco e explicada pela aplicação.** O banco recusa excluir um
+tipo em uso, um usuário que é dono de restaurante (`ON DELETE RESTRICT`), um preço não
+positivo ou horários iguais (`CHECK`). A aplicação confere as mesmas regras antes, para
+responder 409 ou 400 com uma mensagem que diz o que fazer, e não o erro genérico de
+integridade.
+
+**O dono do restaurante é qualquer usuário existente.** O enunciado pede que o dono seja
+"associado a um usuário existente"; o restaurante guarda o `ownerId` e o caso de uso confere
+que ele existe (404 se não existir).
+
+**Horário de funcionamento que atravessa a meia-noite.** `OpeningHours` guarda abertura e
+fechamento (`HH:mm`). Fechamento antes da abertura é válido e significa que o restaurante
+vira a noite (18:00 às 02:00). Abertura igual ao fechamento é recusada, porque não dá para
+saber se o restaurante nunca abre ou nunca fecha.
+
+**Itens do cardápio aninhados ao restaurante.** As rotas são
+`/restaurants/{restaurantId}/menu-items`: o item não existe fora de um restaurante, e um item
+de outro restaurante responde 404 pelo caminho errado. O nome é único dentro do restaurante,
+sem diferenciar maiúsculas, e restaurantes diferentes podem ter pratos de mesmo nome.
+Excluir o restaurante exclui o cardápio dele (`ON DELETE CASCADE`).
+
+**Preço em `BigDecimal`.** Valores monetários não usam ponto flutuante. O preço é positivo,
+tem no máximo duas casas decimais e é guardado em `NUMERIC(10, 2)`.
+
+**Foto como caminho.** Como o enunciado permite, o item guarda só o caminho de onde a foto
+estaria (`photoPath`), sem upload de arquivo.
+
+**Paginação sem depender do Spring no núcleo.** Casos de uso e gateways trabalham com
+`PageQuery` e `PageResult`, da camada de aplicação; a conversão para `Pageable` e `Page`
+acontece só no gateway JPA.
+
+### Fase 1
 
 **Herança JOINED para os perfis de usuário.** `Customer` e `RestaurantOwner` compartilham
 nome, e-mail, login, senha e endereço, mas têm atributos próprios (CPF e data de
@@ -39,10 +141,9 @@ nascimento; nome do restaurante e CNPJ). A estratégia `JOINED` mantém os campo
 cada coluna — o que `SINGLE_TABLE` não permitiria sem tornar tudo anulável. O custo é um
 `JOIN` por consulta ao subtipo, aceitável no volume deste domínio.
 
-**Versionamento da API pela URI.** A versão faz parte do caminho (`/api/v1/...`) e os
-controllers ficam em `controller.v1`. É explícito no endereço, testável direto no navegador
-e no Postman, e permite que uma futura `v2` conviva com a `v1` sem quebrar consumidores:
-bastaria um pacote `controller.v2` reaproveitando a camada de serviço.
+**Versionamento da API pela URI.** A versão faz parte do caminho (`/api/v1/...`). É
+explícito no endereço, testável direto no navegador e no Postman, e permite que uma futura
+`v2` conviva com a `v1` sem quebrar consumidores.
 
 **Erros no padrão RFC 7807.** Todas as respostas de erro são `application/problem+json`,
 com `type` identificando a classe do problema de forma estável e legível por máquina. Erros
@@ -69,13 +170,11 @@ controllers e testes dependem da abstração, não da implementação (`…Servi
 Inversão de Dependência). `BaseUserService` orquestra o que vale para qualquer usuário —
 troca de senha e exclusão —; a regra de unicidade de e-mail e login fica no colaborador
 `UserUniquenessValidator` (Responsabilidade Única); e um novo perfil de usuário se
-resolve por uma nova subclasse, sem tocar no código existente (Aberto/Fechado). Os
-serviços concretos tratam apenas o que é específico do subtipo (CPF, CNPJ, nome do
-restaurante).
+resolve por uma nova subclasse, sem tocar no código existente (Aberto/Fechado).
 
-**Senhas com BCrypt, sem a stack de filtros do Spring Security.** O escopo desta fase é a
-validação de credenciais, não a proteção das rotas. Usar apenas `spring-security-crypto`
-entrega o hash com salt sem introduzir a cadeia de filtros que ainda não é necessária.
+**Senhas com BCrypt, sem a stack de filtros do Spring Security.** O escopo é a validação de
+credenciais, não a proteção das rotas. Usar apenas `spring-security-crypto` entrega o hash
+com salt sem introduzir a cadeia de filtros que ainda não é necessária.
 
 ## Como executar
 
@@ -88,7 +187,8 @@ docker compose logs -f app
 ```
 
 O Compose sobe o PostgreSQL 16 e a aplicação. O container da aplicação só inicia após o
-healthcheck do banco passar, e o Flyway cria o schema na primeira subida.
+healthcheck do banco passar, e o Flyway cria o schema na primeira subida e aplica as
+migrations novas nas seguintes.
 
 ### Local, com o Maven Wrapper
 
@@ -122,6 +222,60 @@ Com a aplicação no ar:
 
 ## Endpoints
 
+### Tipos de usuário (Fase 2)
+
+| Método | Caminho | Descrição |
+|---|---|---|
+| POST | `/api/v1/user-types` | Cadastra; nome único sem diferenciar maiúsculas |
+| GET | `/api/v1/user-types` | Lista todos, em ordem alfabética |
+| GET | `/api/v1/user-types/{id}` | Busca por id |
+| PUT | `/api/v1/user-types/{id}` | Renomeia |
+| DELETE | `/api/v1/user-types/{id}` | Exclui; recusado (409) se algum usuário tiver o tipo |
+| PUT | `/api/v1/users/{id}/user-type` | Associa o usuário a um tipo: `{"userTypeId": 1}` |
+
+### Restaurantes (Fase 2)
+
+| Método | Caminho | Descrição |
+|---|---|---|
+| POST | `/api/v1/restaurants` | Cadastra |
+| GET | `/api/v1/restaurants` | Lista paginada, com filtros opcionais `?name=` e `?cuisineType=` |
+| GET | `/api/v1/restaurants/{id}` | Busca por id |
+| PUT | `/api/v1/restaurants/{id}` | Atualiza todos os dados, inclusive o dono |
+| DELETE | `/api/v1/restaurants/{id}` | Exclui, junto com o cardápio |
+
+```json
+{
+  "name": "Cantina da Nonna",
+  "address": {
+    "street": "Rua Augusta", "number": "1500", "complement": "Loja 2",
+    "city": "São Paulo", "state": "SP", "zipCode": "01305-100"
+  },
+  "cuisineType": "Italiana",
+  "openingHours": { "opensAt": "18:00", "closesAt": "02:00" },
+  "ownerId": 1
+}
+```
+
+### Cardápio (Fase 2)
+
+| Método | Caminho | Descrição |
+|---|---|---|
+| POST | `/api/v1/restaurants/{restaurantId}/menu-items` | Cadastra um item |
+| GET | `/api/v1/restaurants/{restaurantId}/menu-items` | Lista paginada do cardápio |
+| GET | `/api/v1/restaurants/{restaurantId}/menu-items/{itemId}` | Busca um item |
+| PUT | `/api/v1/restaurants/{restaurantId}/menu-items/{itemId}` | Atualiza um item |
+| DELETE | `/api/v1/restaurants/{restaurantId}/menu-items/{itemId}` | Exclui um item |
+
+```json
+{
+  "name": "Risoto de cogumelos",
+  "description": "Arroz arbóreo, funghi secchi e parmesão",
+  "price": 68.90,
+  "dineInOnly": false,
+  "photoPath": "/images/restaurants/1/risoto.jpg"
+}
+```
+
 ### Autenticação
 
 | Método | Caminho | Descrição |
@@ -132,23 +286,23 @@ Com a aplicação no ar:
 
 | Método | Caminho | Descrição |
 |---|---|---|
-| POST | `/api/v1/customers` | Cadastra |
+| POST | `/api/v1/customers` | Cadastra; nasce com o tipo "Cliente" |
 | GET | `/api/v1/customers` | Lista paginada (`page`, `size`, `sort`), com filtro opcional `?name=` |
 | GET | `/api/v1/customers/{id}` | Busca por id |
 | PUT | `/api/v1/customers/{id}` | Atualiza dados cadastrais |
 | PATCH | `/api/v1/customers/{id}/password` | Troca a senha |
-| DELETE | `/api/v1/customers/{id}` | Exclui |
+| DELETE | `/api/v1/customers/{id}` | Exclui; recusado (409) se for dono de restaurante |
 
 ### Donos de restaurante
 
 | Método | Caminho | Descrição |
 |---|---|---|
-| POST | `/api/v1/restaurant-owners` | Cadastra |
+| POST | `/api/v1/restaurant-owners` | Cadastra; nasce com o tipo "Dono de Restaurante" |
 | GET | `/api/v1/restaurant-owners` | Lista paginada (`page`, `size`, `sort`), com filtro opcional `?name=` |
 | GET | `/api/v1/restaurant-owners/{id}` | Busca por id |
 | PUT | `/api/v1/restaurant-owners/{id}` | Atualiza dados cadastrais |
 | PATCH | `/api/v1/restaurant-owners/{id}/password` | Troca a senha |
-| DELETE | `/api/v1/restaurant-owners/{id}` | Exclui |
+| DELETE | `/api/v1/restaurant-owners/{id}` | Exclui; recusado (409) se ainda tiver restaurantes |
 
 ### Usuários
 
@@ -158,24 +312,29 @@ Com a aplicação no ar:
 | GET | `/api/v1/users/{id}` | Busca qualquer usuário por id |
 
 A consulta unificada atende à busca por nome sem exigir que o consumidor saiba de antemão
-se o usuário é cliente ou dono.
+se o usuário é cliente ou dono. As respostas de usuário trazem `assignedUserType`
+(`{"id": 2, "name": "Cliente"}`), o tipo associado.
 
 ### Paginação
 
-Os três endpoints `GET` de listagem (`/customers`, `/restaurant-owners`, `/users`) são
-paginados com o suporte padrão do Spring Data. Parâmetros de consulta:
+As listagens de usuários (`/customers`, `/restaurant-owners`, `/users`) usam o suporte padrão
+do Spring Data; as da Fase 2 (`/restaurants`, `.../menu-items`) recebem só página e tamanho e
+devolvem em ordem alfabética de nome.
 
 | Parâmetro | Padrão | Observação |
 |---|---|---|
 | `page` | `0` | Índice da página, base zero |
 | `size` | `20` | Itens por página; máximo `100` |
-| `sort` | — | Campo e direção, ex.: `sort=name,asc` (repetível) |
+| `sort` | — | Só nas listagens de usuários. Campo e direção, ex.: `sort=name,asc` |
 
 A resposta é um envelope: `content` (a página de itens) mais os metadados `page`, `size`,
-`totalElements`, `totalPages` e `last`. O filtro `?name=` é combinável com a paginação.
-A busca por `id` não é paginada.
+`totalElements`, `totalPages` e `last`. Os filtros são combináveis com a paginação. A busca
+por `id` não é paginada. A lista de tipos de usuário não é paginada: é uma tabela de
+referência com poucas linhas.
 
 ## Regras de validação e unicidade
+
+### Usuários
 
 | Campo | Regra |
 |---|---|
@@ -190,43 +349,68 @@ A busca por `id` não é paginada.
 **E-mail e login são identificadores únicos e independentes.** O enunciado exige unicidade
 apenas do e-mail; o login foi mantido também único, de forma independente, porque é a
 credencial consumida pelo serviço de validação de login e precisa identificar um único
-usuário sem ambiguidade. O e-mail é o canal de contato/recuperação e pode mudar sem afetar
-o acesso; o login é o identificador estável de autenticação. Ambos são únicos no conjunto
-de todos os usuários, não por subtipo, e comparados sem diferenciar a caixa.
+usuário sem ambiguidade. Ambos são únicos no conjunto de todos os usuários, não por
+subtipo, e comparados sem diferenciar a caixa.
 
 **CPF e CNPJ são opcionais** porque não estão na lista de campos obrigatórios do enunciado
-(nome, e-mail, login, senha, data da última alteração e endereço) — são enriquecimento dos
-subtipos. Quando informados, seguem o formato esperado e têm unicidade garantida no banco
-e verificada no serviço (resposta `409` apontando o campo).
+— são enriquecimento dos subtipos. Quando informados, seguem o formato esperado e têm
+unicidade garantida no banco e verificada no serviço (resposta `409` apontando o campo).
 
 Na atualização, o endereço ausente no corpo significa manter o atual, não apagá-lo.
+
+### Tipos de usuário, restaurantes e cardápio
+
+| Recurso | Campo | Regra |
+|---|---|---|
+| Tipo de usuário | `name` | Obrigatório, até 50 caracteres, único sem diferenciar maiúsculas |
+| Restaurante | `name` | Obrigatório, até 100 caracteres |
+| Restaurante | `address` | Obrigatório; `street`, `number`, `city`, `state` e `zipCode` obrigatórios, `complement` opcional |
+| Restaurante | `cuisineType` | Obrigatório, até 50 caracteres |
+| Restaurante | `openingHours` | `opensAt` e `closesAt` obrigatórios (`HH:mm`) e diferentes; fechamento antes da abertura significa que vira a noite |
+| Restaurante | `ownerId` | Obrigatório; precisa ser um usuário existente |
+| Item do cardápio | `name` | Obrigatório, até 100 caracteres, único no restaurante sem diferenciar maiúsculas |
+| Item do cardápio | `description` | Obrigatória, até 500 caracteres |
+| Item do cardápio | `price` | Obrigatório, maior que zero, até duas casas decimais |
+| Item do cardápio | `dineInOnly` | Obrigatório; `true` quando o item só pode ser pedido para consumo no restaurante |
+| Item do cardápio | `photoPath` | Opcional, até 500 caracteres |
+
+As regras valem duas vezes: no DTO, para a API responder 400 com `fieldErrors` por campo, e
+na entidade de domínio, que se protege sozinha mesmo quando usada fora da camada web.
 
 ## Modelo de erros
 
 ```json
 {
-  "type": "https://restaurant-api.com/errors/login-conflict",
-  "title": "Login Já Cadastrado",
+  "type": "https://restaurant-api.com/errors/user-type-in-use",
+  "title": "Tipo de Usuário em Uso",
   "status": 409,
-  "detail": "Já existe um usuário cadastrado com o login: maria.silva",
-  "instance": "/api/v1/customers",
-  "timestamp": "2026-08-24T21:00:00Z"
+  "detail": "O tipo de usuário 3 está associado a usuários e não pode ser excluído.",
+  "instance": "/api/v1/user-types/3",
+  "timestamp": "2026-10-11T21:00:00Z"
 }
 ```
 
 | Status | `type` | Situação |
 |---|---|---|
 | 400 | `validation-error` | Bean Validation recusou campos; inclui `fieldErrors` |
-| 400 | `malformed-json` | Corpo ausente ou JSON malformado |
+| 400 | `domain-validation` | Uma regra de entidade de domínio foi violada, como horários de abertura e fechamento iguais |
+| 400 | `malformed-json` | Corpo ausente, JSON malformado ou valor em formato inválido (ex.: horário `25:00`) |
 | 400 | `invalid-parameter` | Parâmetro de caminho ou query com tipo incompatível |
 | 401 | `invalid-credentials` | Login inexistente ou senha incorreta |
-| 404 | `user-not-found` | Nenhum usuário com o id informado |
+| 404 | `user-not-found` | Nenhum usuário com o id informado, inclusive o dono de um restaurante |
+| 404 | `user-type-not-found` | Nenhum tipo de usuário com o id informado |
+| 404 | `restaurant-not-found` | Nenhum restaurante com o id informado |
+| 404 | `menu-item-not-found` | O item não existe no cardápio do restaurante informado |
 | 404 | `resource-not-found` | Rota inexistente |
 | 405 | `method-not-allowed` | Método HTTP não suportado pelo endpoint |
 | 409 | `email-conflict` | E-mail já cadastrado |
 | 409 | `login-conflict` | Login já cadastrado |
 | 409 | `cpf-conflict` | CPF já cadastrado |
 | 409 | `cnpj-conflict` | CNPJ já cadastrado |
+| 409 | `user-type-conflict` | Já existe um tipo de usuário com o nome |
+| 409 | `user-type-in-use` | Exclusão de tipo de usuário associado a usuários |
+| 409 | `user-owns-restaurants` | Exclusão de usuário que é dono de restaurantes |
+| 409 | `menu-item-conflict` | O restaurante já tem um item com o nome |
 | 409 | `data-integrity-conflict` | Violação de restrição do banco não coberta acima |
 | 422 | `invalid-password` | Senha atual incorreta, ou confirmação divergente |
 | 500 | `internal-error` | Falha não prevista |
@@ -237,45 +421,79 @@ trocar a senha informando a senha atual errada.
 
 ## Banco de dados
 
-O schema é criado pelo Flyway em `src/main/resources/db/migration/V1__create_tables.sql`.
+O schema é criado e evoluído pelo Flyway, em `src/main/resources/db/migration`:
+
+| Migration | O que faz |
+|---|---|
+| `V1__create_tables.sql` | Usuários: `users`, `customers`, `restaurant_owners` |
+| `V2__create_user_types.sql` | Tabela `user_types`, com índice único sobre `LOWER(name)` |
+| `V3__associate_users_with_user_types.sql` | Coluna `users.user_type_id`, os tipos "Dono de Restaurante" e "Cliente" e a associação dos usuários existentes |
+| `V4__create_restaurants.sql` | Tabela `restaurants` |
+| `V5__create_menu_items.sql` | Tabela `menu_items` |
 
 | Tabela | Colunas |
 |---|---|
-| `users` | `id`, `user_type`, `name`, `email` (único), `login` (único), `password`, `last_modified_at`, e o endereço embutido: `street`, `number`, `complement`, `city`, `state`, `zip_code` |
+| `users` | `id`, `user_type` (discriminador), `user_type_id` (FK para `user_types`), `name`, `email` (único), `login` (único), `password`, `last_modified_at`, e o endereço embutido: `street`, `number`, `complement`, `city`, `state`, `zip_code` |
 | `customers` | `id` (FK para `users`), `cpf` (único), `date_of_birth` |
 | `restaurant_owners` | `id` (FK para `users`), `restaurant_name`, `cnpj` (único) |
+| `user_types` | `id`, `name` (único sem diferenciar maiúsculas) |
+| `restaurants` | `id`, `name`, `cuisine_type`, `opens_at`, `closes_at`, `owner_id` (FK para `users`), e o endereço embutido |
+| `menu_items` | `id`, `restaurant_id` (FK para `restaurants`), `name` (único por restaurante sem diferenciar maiúsculas), `description`, `price` (`NUMERIC(10, 2)`), `dine_in_only`, `photo_path` |
 
-As tabelas filhas referenciam `users` por chave estrangeira com `ON DELETE CASCADE`. O
-índice `idx_users_name` é criado sobre `LOWER(name)` para atender à busca por nome sem
-diferenciar maiúsculas de minúsculas.
+| Chave estrangeira | Ao excluir o referenciado |
+|---|---|
+| `customers.id`, `restaurant_owners.id` → `users` | `CASCADE`: os dados do subtipo saem junto |
+| `users.user_type_id` → `user_types` | `RESTRICT`: tipo em uso não pode ser excluído |
+| `restaurants.owner_id` → `users` | `RESTRICT`: dono de restaurante não pode ser excluído |
+| `menu_items.restaurant_id` → `restaurants` | `CASCADE`: o cardápio sai junto com o restaurante |
 
+Restrições `CHECK` impõem no banco que `opens_at <> closes_at` e que `price > 0`. Os índices
+sobre `LOWER(name)` atendem às buscas por nome sem diferenciar maiúsculas.
 `last_modified_at` é mantido pelo Hibernate via `@UpdateTimestamp`.
+
+O modelo de domínio está em [`docs/domain-model.mmd`](docs/domain-model.mmd) (Mermaid) e
+[`docs/domain-model.puml`](docs/domain-model.puml) (PlantUML).
 
 ## Testes
 
 ```bash
-./mvnw test      # 70 testes unitários (JUnit 5 + Mockito)
-./mvnw verify    # + testes de integração com Testcontainers (exige Docker)
+./mvnw test      # 207 testes unitários (JUnit 5 + Mockito) e relatório do JaCoCo
+./mvnw verify    # + 20 testes de integração com Testcontainers (exige Docker) e checagem de cobertura
 ```
 
-**70 testes unitários** cobrindo:
+**Testes unitários**, sem banco e sem subir a aplicação:
 
-- Serviços, com Mockito: `AuthServiceTest`, `CustomerServiceTest`,
-  `RestaurantOwnerServiceTest`, `UserServiceTest` — regras de negócio, unicidade delegada a
-  `UserUniquenessValidator` e paginação
-- Camada web, com `@WebMvcTest`: `AuthControllerTest`, `CustomerControllerTest`,
-  `RestaurantOwnerControllerTest`, `UserControllerTest` — rotas, status, envelope de página
-  e corpo de erro RFC 7807
+- Domínio: `UserTypeTest`, `RestaurantTest`, `OpeningHoursTest`, `AddressTest`,
+  `MenuItemTest` — as regras de cada entidade e objeto de valor
+- Casos de uso, com os gateways mockados: `UserTypeUseCasesTest`,
+  `RestaurantUseCasesTest`, `MenuItemUseCasesTest`, `PaginationTest`
+- Gateways JPA, com os repositórios mockados: `JpaGatewaysTest` — conversão entre domínio
+  e JPA, ordenação e paginação
+- Camada web, com `@WebMvcTest`: `UserTypeControllerTest`,
+  `UserTypeAssignmentControllerTest`, `RestaurantControllerTest`, `MenuItemControllerTest`,
+  e os da Fase 1 (`AuthControllerTest`, `CustomerControllerTest`,
+  `RestaurantOwnerControllerTest`, `UserControllerTest`) — rotas, status, JSON e corpo de
+  erro RFC 7807
+- Serviços da Fase 1: `AuthServiceTest`, `CustomerServiceTest`,
+  `RestaurantOwnerServiceTest`, `UserServiceTest`
 - Tratamento de erros: `GlobalExceptionHandlerTest`, `UnhandledExceptionHandlerTest`
 
-**Teste de integração** (`SchemaConstraintsIT`, sufixo `IT` → roda em `mvn verify` pelo
-maven-failsafe-plugin): sobe um PostgreSQL real com Testcontainers e valida que a migration
-`V1` do Flyway cria o schema e que as constraints de unicidade (`email`, `login`, `cpf`,
-`cnpj`) são impostas pelo banco. Sem Docker disponível, a classe é ignorada sem quebrar o
-build.
+**Testes de integração** (sufixo `IT`, rodam em `mvn verify` pelo maven-failsafe-plugin):
+sobem um PostgreSQL 16 real com Testcontainers e exercitam a aplicação de ponta a ponta,
+do HTTP ao banco.
+
+| Classe | O que prova |
+|---|---|
+| `SchemaConstraintsIT` | Todas as migrations aplicam e as constraints de unicidade dos usuários valem no banco |
+| `UserTypeApiIT` | CRUD de tipos, unicidade sem diferenciar maiúsculas, associação e tipo em uso |
+| `RestaurantApiIT` | CRUD de restaurantes, filtros e paginação, dono inexistente, dono que não pode ser excluído e `CHECK` de horário |
+| `MenuItemApiIT` | CRUD do cardápio, unicidade por restaurante, isolamento entre restaurantes, cascata e constraints de preço |
+
+Sem Docker disponível, as classes de integração são ignoradas sem quebrar o build.
 
 **Cobertura** pelo JaCoCo (relatório em `target/site/jacoco/index.html` após `mvn test`):
-~83% das instruções e ~81% das linhas na suíte unitária.
+~89% das linhas e ~90% das instruções na suíte unitária. O `mvn verify` falha se a
+cobertura de linhas ficar abaixo de 80%.
 
 ## Coleção Postman
 
@@ -284,28 +502,49 @@ newman run postman/restaurant-management.postman_collection.json
 ```
 
 As pastas estão numeradas na ordem de execução, porque cada uma depende do que a anterior
-cadastrou. Os ids são capturados dos próprios cadastros, e cada execução gera e-mails,
-logins, CPF e CNPJ distintos — a coleção pode rodar várias vezes no mesmo banco sem
-esbarrar nas restrições de unicidade.
+cadastrou:
 
-Cobre cadastro válido e recusado, validação de login, busca por nome nos três endpoints,
-atualização, troca de senha e exclusão, com os respectivos cenários de erro.
+1. Cadastro de usuários
+2. Validação de login
+3. Busca de usuários
+4. Atualização de dados
+5. Troca de senha
+6. Tipos de usuário: CRUD, associação e tipo em uso
+7. Restaurantes: CRUD, filtros e dono que não pode ser excluído
+8. Cardápio: CRUD, nome repetido, preço inválido e exclusão em cascata
+9. Exclusão de usuários
+
+Os ids são capturados dos próprios cadastros, e cada execução gera e-mails, logins, CPF,
+CNPJ e nomes distintos — a coleção pode rodar várias vezes no mesmo banco sem esbarrar nas
+restrições de unicidade. São 67 requisições e 147 asserções, cobrindo os cenários de
+sucesso e de erro.
 
 ## Estrutura
 
 ```
 src/main/java/com/restaurant/management
-├── config          Configuração do OpenAPI e exemplos de payload
-├── controller/v1   Controllers REST da versão 1
-├── domain
-│   ├── enums       UserType
-│   ├── model       Entidades JPA e o embeddable Address
-│   └── repository  Repositórios Spring Data
-├── dto
-│   ├── request            Payloads de entrada com Bean Validation
-│   │   └── validation     @StrongPassword e seu validador
-│   └── response           Payloads de saída (sem senha) e PageResponse
-├── exception       Exceções de negócio e tratadores RFC 7807
-└── service         Interfaces de serviço, implementações (…ServiceImpl),
-                    BaseUserService e UserUniquenessValidator
+├── core                         Fase 2 — Java puro, sem Spring nem JPA
+│   ├── domain
+│   │   ├── exception            DomainValidationException
+│   │   ├── shared               Address (objeto de valor)
+│   │   ├── usertype             UserType
+│   │   ├── restaurant           Restaurant, OpeningHours
+│   │   └── menuitem             MenuItem
+│   └── application
+│       ├── exception            Exceções dos casos de uso (não encontrado, conflito)
+│       ├── pagination           PageQuery, PageResult
+│       ├── user                 UserGateway
+│       ├── usertype             Casos de uso e UserTypeGateway
+│       ├── restaurant           Casos de uso, RestaurantGateway e RestaurantCommand
+│       └── menuitem             Casos de uso, MenuItemGateway e MenuItemCommand
+├── infrastructure               Fase 2 — adaptadores
+│   ├── config                   Registra os casos de uso como beans
+│   ├── persistence              Entidades JPA, repositórios Spring Data e gateways
+│   └── web                      Controllers REST e DTOs
+├── config                       Configuração do OpenAPI e exemplos de payload
+├── controller/v1                Fase 1 — controllers REST de usuários e login
+├── domain                       Fase 1 — entidades JPA de usuário e repositórios
+├── dto                          Fase 1 — payloads de entrada e saída, PageResponse
+├── exception                    Exceções da Fase 1 e tratadores RFC 7807
+└── service                      Fase 1 — serviços de usuário
 ```
