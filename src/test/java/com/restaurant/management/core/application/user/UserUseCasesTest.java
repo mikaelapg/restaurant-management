@@ -102,7 +102,7 @@ class UserUseCasesTest {
         }
 
         @Test
-        @DisplayName("dono nasce com o tipo \\"Dono de Restaurante\\" e pode ser responsável por restaurantes")
+        @DisplayName("dono nasce com o tipo \"Dono de Restaurante\" e pode ser responsável por restaurantes")
         void shouldCreateOwnerAbleToOwnRestaurants() {
             when(userTypeGateway.findByProfile(UserProfile.RESTAURANT_OWNER)).thenReturn(Optional.of(OWNER_TYPE));
             when(passwordHasher.hash(PASSWORD)).thenReturn(HASH);
