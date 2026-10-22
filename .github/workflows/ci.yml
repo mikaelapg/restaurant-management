@@ -45,9 +45,17 @@ jobs:
         if: always()
         run: |
           if [ -f target/site/jacoco/jacoco.csv ]; then
-            awk -F, 'NR>1 {missed+=$8; covered+=$9} END {printf "### Cobertura de linhas: %.1f%%\n", 100*covered/(missed+covered)}' \
-              target/site/jacoco/jacoco.csv >> "$GITHUB_STEP_SUMMARY"
+            cov=$(awk -F, 'NR>1 {missed+=$8; covered+=$9} END {printf "%.1f", 100*covered/(missed+covered)}' target/site/jacoco/jacoco.csv)
+            echo "### Cobertura de linhas: ${cov}%" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=Cobertura::Cobertura de linhas: ${cov}%"
           fi
+          for kind in surefire failsafe; do
+            if ls target/$kind-reports/*.xml >/dev/null 2>&1; then
+              tests=$(cat target/$kind-reports/TEST-*.xml | grep -o '<testsuite [^>]*' | grep -o ' tests="[0-9]*"' | grep -o '[0-9]*' | paste -sd+ | bc)
+              skipped=$(cat target/$kind-reports/TEST-*.xml | grep -o '<testsuite [^>]*' | grep -o ' skipped="[0-9]*"' | grep -o '[0-9]*' | paste -sd+ | bc)
+              echo "::notice title=Testes ($kind)::${tests} testes, ${skipped} ignorados"
+            fi
+          done
 
       - name: Relatórios de teste e cobertura
         if: always()
