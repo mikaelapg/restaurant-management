@@ -7,7 +7,7 @@ import com.restaurant.management.core.application.menuitem.ListMenuItemsUseCase;
 import com.restaurant.management.core.application.menuitem.UpdateMenuItemUseCase;
 import com.restaurant.management.core.application.pagination.PageQuery;
 import com.restaurant.management.core.domain.menuitem.MenuItem;
-import com.restaurant.management.dto.response.PageResponse;
+import com.restaurant.management.infrastructure.web.shared.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

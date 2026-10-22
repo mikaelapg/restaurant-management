@@ -1,5 +1,6 @@
 package com.restaurant.management.infrastructure.config;
 
+import com.restaurant.management.core.application.restaurant.RestaurantGateway;
 import com.restaurant.management.core.application.user.UserGateway;
 import com.restaurant.management.core.application.usertype.AssignUserTypeUseCase;
 import com.restaurant.management.core.application.usertype.CreateUserTypeUseCase;
@@ -47,7 +48,8 @@ public class UserTypeConfig {
     }
 
     @Bean
-    public AssignUserTypeUseCase assignUserTypeUseCase(UserGateway userGateway, UserTypeGateway userTypeGateway) {
-        return new AssignUserTypeUseCase(userGateway, userTypeGateway);
+    public AssignUserTypeUseCase assignUserTypeUseCase(UserGateway userGateway, UserTypeGateway userTypeGateway,
+                                                       RestaurantGateway restaurantGateway) {
+        return new AssignUserTypeUseCase(userGateway, userTypeGateway, restaurantGateway);
     }
 }

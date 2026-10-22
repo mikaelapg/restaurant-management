@@ -1,8 +1,11 @@
 package com.restaurant.management.infrastructure.persistence.usertype;
 
+import com.restaurant.management.core.domain.user.UserProfile;
 import com.restaurant.management.core.domain.usertype.UserType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -35,11 +38,21 @@ public class UserTypeJpaEntity {
     @Column(nullable = false, length = UserType.NAME_MAX_LENGTH)
     private String name;
 
+    /** Perfil ligado aos tipos de sistema; nulo nos tipos criados pela API. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private UserProfile profile;
+
+    /** Atalho para tipos que não são de sistema. */
+    public UserTypeJpaEntity(Long id, String name) {
+        this(id, name, null);
+    }
+
     public static UserTypeJpaEntity fromDomain(UserType userType) {
-        return new UserTypeJpaEntity(userType.getId(), userType.getName());
+        return new UserTypeJpaEntity(userType.getId(), userType.getName(), userType.getProfile());
     }
 
     public UserType toDomain() {
-        return UserType.restore(id, name);
+        return UserType.restore(id, name, profile);
     }
 }

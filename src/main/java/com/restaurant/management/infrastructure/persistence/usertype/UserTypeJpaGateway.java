@@ -1,6 +1,7 @@
 package com.restaurant.management.infrastructure.persistence.usertype;
 
 import com.restaurant.management.core.application.usertype.UserTypeGateway;
+import com.restaurant.management.core.domain.user.UserProfile;
 import com.restaurant.management.core.domain.usertype.UserType;
 import org.springframework.stereotype.Component;
 
@@ -43,6 +44,11 @@ public class UserTypeJpaGateway implements UserTypeGateway {
     @Override
     public Optional<UserType> findByNameIgnoreCase(String name) {
         return repository.findByNameIgnoreCase(name).map(UserTypeJpaEntity::toDomain);
+    }
+
+    @Override
+    public Optional<UserType> findByProfile(UserProfile profile) {
+        return repository.findByProfile(profile).map(UserTypeJpaEntity::toDomain);
     }
 
     @Override

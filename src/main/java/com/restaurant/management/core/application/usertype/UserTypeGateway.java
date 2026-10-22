@@ -1,5 +1,6 @@
 package com.restaurant.management.core.application.usertype;
 
+import com.restaurant.management.core.domain.user.UserProfile;
 import com.restaurant.management.core.domain.usertype.UserType;
 
 import java.util.List;
@@ -23,6 +24,9 @@ public interface UserTypeGateway {
 
     /** Busca ignorando maiúsculas e minúsculas: "cliente" e "Cliente" são o mesmo nome. */
     Optional<UserType> findByNameIgnoreCase(String name);
+
+    /** O tipo de sistema ligado ao perfil ("Dono de Restaurante" ou "Cliente"). */
+    Optional<UserType> findByProfile(UserProfile profile);
 
     void deleteById(Long id);
 }

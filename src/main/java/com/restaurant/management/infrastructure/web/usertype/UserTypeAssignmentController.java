@@ -1,8 +1,7 @@
 package com.restaurant.management.infrastructure.web.usertype;
 
 import com.restaurant.management.core.application.usertype.AssignUserTypeUseCase;
-import com.restaurant.management.dto.response.UserResponse;
-import com.restaurant.management.service.UserService;
+import com.restaurant.management.infrastructure.web.user.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,20 +29,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserTypeAssignmentController {
 
     private final AssignUserTypeUseCase assignUserType;
-    private final UserService userService;
 
     @PutMapping
     @Operation(summary = "Associar usuário a um tipo",
-            description = "Substitui o tipo atual do usuário. Clientes e donos já nascem com o tipo correspondente.")
+            description = "Substitui o tipo atual do usuário. Clientes e donos já nascem com o tipo de sistema do "
+                    + "seu perfil. Um tipo de sistema só pode ser dado a usuários do mesmo perfil, e quem é "
+                    + "responsável por restaurantes precisa continuar com o tipo de dono.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Associação feita; devolve o usuário atualizado"),
             @ApiResponse(responseCode = "400", description = "userTypeId ausente"),
-            @ApiResponse(responseCode = "404", description = "Usuário ou tipo de usuário não encontrado")
+            @ApiResponse(responseCode = "404", description = "Usuário ou tipo de usuário não encontrado"),
+            @ApiResponse(responseCode = "409", description = "O usuário é dono de restaurantes e perderia o tipo de dono"),
+            @ApiResponse(responseCode = "422", description = "Tipo de sistema de outro perfil (ex.: \"Cliente\" para um dono)")
     })
     public ResponseEntity<UserResponse> assign(
             @Parameter(description = "Identificador do usuário", example = "1") @PathVariable Long userId,
             @Valid @RequestBody AssignUserTypeRequest request) {
-        assignUserType.execute(userId, request.userTypeId());
-        return ResponseEntity.ok(userService.findById(userId));
+        return ResponseEntity.ok(UserResponse.fromDomain(assignUserType.execute(userId, request.userTypeId())));
     }
 }

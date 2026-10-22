@@ -6,7 +6,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * Endereço nos corpos de entrada e de saída da API da Fase 2.
+ * Endereço nos corpos de entrada e de saída da API: restaurantes e usuários.
+ * <p>
+ * No restaurante o endereço é obrigatório; no usuário é opcional, mas, quando vem,
+ * vem completo.
  * <p>
  * As anotações repetem as regras do {@link Address} de domínio para que a API responda
  * 400 com {@code fieldErrors} apontando cada campo.
@@ -51,5 +54,15 @@ public record AddressDto(
     public static AddressDto fromDomain(Address address) {
         return new AddressDto(address.street(), address.number(), address.complement(),
                 address.city(), address.state(), address.zipCode());
+    }
+
+    /** Para o endereço do usuário, que é opcional: nulo continua nulo. */
+    public static AddressDto fromNullable(Address address) {
+        return address == null ? null : fromDomain(address);
+    }
+
+    /** Converte um endereço opcional vindo da requisição. */
+    public static Address toNullableDomain(AddressDto dto) {
+        return dto == null ? null : dto.toDomain();
     }
 }

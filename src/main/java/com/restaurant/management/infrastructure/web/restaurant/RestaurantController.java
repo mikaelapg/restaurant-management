@@ -7,7 +7,7 @@ import com.restaurant.management.core.application.restaurant.FindRestaurantByIdU
 import com.restaurant.management.core.application.restaurant.ListRestaurantsUseCase;
 import com.restaurant.management.core.application.restaurant.UpdateRestaurantUseCase;
 import com.restaurant.management.core.domain.restaurant.Restaurant;
-import com.restaurant.management.dto.response.PageResponse;
+import com.restaurant.management.infrastructure.web.shared.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -43,11 +43,13 @@ public class RestaurantController {
     private final DeleteRestaurantUseCase deleteRestaurant;
 
     @PostMapping
-    @Operation(summary = "Cadastrar restaurante", description = "O dono precisa ser um usuário existente.")
+    @Operation(summary = "Cadastrar restaurante",
+            description = "O dono precisa ser um usuário existente com o tipo de usuário \"Dono de Restaurante\".")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Restaurante cadastrado; o header Location aponta para ele"),
             @ApiResponse(responseCode = "400", description = "Campos inválidos ou horários de abertura e fechamento iguais"),
-            @ApiResponse(responseCode = "404", description = "O dono informado não existe")
+            @ApiResponse(responseCode = "404", description = "O dono informado não existe"),
+            @ApiResponse(responseCode = "422", description = "O usuário informado não é dono de restaurante")
     })
     public ResponseEntity<RestaurantResponse> create(@Valid @RequestBody RestaurantRequest request) {
         Restaurant created = createRestaurant.execute(request.toCommand());
@@ -87,11 +89,13 @@ public class RestaurantController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Atualizar restaurante", description = "Substitui todos os dados, inclusive o dono.")
+    @Operation(summary = "Atualizar restaurante",
+            description = "Substitui todos os dados, inclusive o dono, que segue a mesma regra do cadastro.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Restaurante atualizado"),
             @ApiResponse(responseCode = "400", description = "Campos inválidos"),
-            @ApiResponse(responseCode = "404", description = "Restaurante ou dono não encontrado")
+            @ApiResponse(responseCode = "404", description = "Restaurante ou dono não encontrado"),
+            @ApiResponse(responseCode = "422", description = "O usuário informado não é dono de restaurante")
     })
     public ResponseEntity<RestaurantResponse> update(@PathVariable Long id,
                                                      @Valid @RequestBody RestaurantRequest request) {

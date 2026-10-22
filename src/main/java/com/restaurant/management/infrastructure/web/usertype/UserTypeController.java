@@ -81,7 +81,8 @@ public class UserTypeController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Atualizar tipo de usuário")
+    @Operation(summary = "Atualizar tipo de usuário",
+            description = "Renomeia o tipo. Os tipos de sistema também podem ser renomeados e continuam ligados ao perfil.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tipo atualizado"),
             @ApiResponse(responseCode = "400", description = "Nome vazio ou com mais de 50 caracteres"),
@@ -94,10 +95,13 @@ public class UserTypeController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Excluir tipo de usuário")
+    @Operation(summary = "Excluir tipo de usuário",
+            description = "Os tipos de sistema (\"Dono de Restaurante\" e \"Cliente\") e os tipos associados a "
+                    + "algum usuário não podem ser excluídos.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Tipo excluído"),
-            @ApiResponse(responseCode = "404", description = "Tipo não encontrado")
+            @ApiResponse(responseCode = "404", description = "Tipo não encontrado"),
+            @ApiResponse(responseCode = "409", description = "Tipo de sistema ou associado a usuários")
     })
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         deleteUserType.execute(id);
