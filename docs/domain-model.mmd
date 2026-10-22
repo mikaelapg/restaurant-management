@@ -1,25 +1,32 @@
-%% Modelo de domínio — Sistema de Gestão de Restaurantes (Fases 1 e 2)
+%% Modelo de domínio — Sistema de Gestão de Restaurantes (core.domain)
 %% Renderizar:  mmdc -i docs/domain-model.mmd -o docs/domain-model.png
 %% ou colar em https://mermaid.live
-%% UserProfile é o enum domain.enums.UserType do código; o nome muda aqui para não
-%% colidir com a entidade UserType da Fase 2 (core.domain.usertype.UserType).
 classDiagram
     class User {
-        <<abstract>>
         +Long id
         +String name
-        +String email  «unique»
+        +String email  «unique, minúsculas»
         +String login  «unique»
-        #String password  «hash BCrypt»
+        #String passwordHash  «BCrypt»
         +LocalDateTime lastModifiedAt
-        +UserProfile userType  «discriminador»
+        +getProfile() UserProfile
+        +updateData(...) User
+        +changePassword(hash) User
+        +assignType(UserType) User
+        +canOwnRestaurants() boolean
     }
-    class Customer {
+    class ProfileDetails {
+        <<sealed interface>>
+        +profile() UserProfile
+    }
+    class CustomerDetails {
+        <<record>>
         +String cpf  «unique, opcional»
-        +LocalDate dateOfBirth  «opcional»
+        +LocalDate dateOfBirth  «opcional, no passado»
     }
-    class RestaurantOwner {
-        +String restaurantName
+    class RestaurantOwnerDetails {
+        <<record>>
+        +String restaurantName  «opcional»
         +String cnpj  «unique, opcional»
     }
     class UserProfile {
@@ -28,13 +35,13 @@ classDiagram
         CUSTOMER
     }
     class UserType {
-        <<Fase 2>>
         +Long id
         +String name  «unique, sem diferenciar maiúsculas»
+        +UserProfile profile  «só nos tipos de sistema»
+        +isSystemType() boolean
         +rename(newName) UserType
     }
     class Restaurant {
-        <<Fase 2>>
         +Long id
         +String name
         +String cuisineType
@@ -49,7 +56,6 @@ classDiagram
         +isOpenAt(time) boolean
     }
     class MenuItem {
-        <<Fase 2>>
         +Long id
         +Long restaurantId
         +String name  «unique no restaurante»
@@ -69,12 +75,14 @@ classDiagram
         +String zipCode
     }
 
-    User <|-- Customer : JOINED (PK = FK, 1:1)
-    User <|-- RestaurantOwner : JOINED (PK = FK, 1:1)
-    User "1" *-- "0..1" Address : composição (colunas de users)
-    User ..> UserProfile : discriminador
-    User "0..*" --> "0..1" UserType : assignedUserType (FK, RESTRICT)
-    Restaurant "0..*" --> "1" User : dono (owner_id, RESTRICT)
-    Restaurant "1" *-- "1" Address : composição (colunas de restaurants)
+    User "1" *-- "1" ProfileDetails : dados do perfil
+    ProfileDetails <|.. CustomerDetails
+    ProfileDetails <|.. RestaurantOwnerDetails
+    ProfileDetails ..> UserProfile
+    User "1" *-- "0..1" Address : endereço opcional
+    User "0..*" --> "0..1" UserType : tipo (FK, RESTRICT)
+    UserType ..> UserProfile : tipos de sistema
+    Restaurant "0..*" --> "1" User : dono, só com o tipo de dono (RESTRICT)
+    Restaurant "1" *-- "1" Address
     Restaurant "1" *-- "1" OpeningHours
     Restaurant "1" *-- "0..*" MenuItem : cardápio (CASCADE)

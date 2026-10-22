@@ -1,5 +1,5 @@
 @startuml domain-model
-' Modelo de domínio — Sistema de Gestão de Restaurantes (Fases 1 e 2)
+' Modelo de domínio — Sistema de Gestão de Restaurantes (core.domain)
 ' Renderizar:  plantuml docs/domain-model.puml        (gera docs/domain-model.png)
 '   ou:        docker run --rm -v "$PWD":/work plantuml/plantuml -tpng /work/docs/domain-model.puml
 
@@ -11,25 +11,33 @@ skinparam class {
 }
 hide circle
 
-package "Fase 1 — usuários" {
-  abstract class User <<abstract>> {
-    +id : Long  <<PK>>
+package "core.domain.user" {
+  class User {
+    +id : Long
     +name : String
-    +email : String  <<unique>>
+    +email : String  <<unique, minúsculas>>
     +login : String  <<unique>>
-    --
-    #password : String  (hash BCrypt)
+    #passwordHash : String  (BCrypt)
     +lastModifiedAt : LocalDateTime
-    +userType : UserProfile  <<discriminador>>
+    --
+    +getProfile() : UserProfile
+    +updateData(...) : User
+    +changePassword(hash) : User
+    +assignType(UserType) : User
+    +canOwnRestaurants() : boolean
   }
 
-  class Customer {
+  interface ProfileDetails <<sealed>> {
+    +profile() : UserProfile
+  }
+
+  class CustomerDetails <<record>> {
     +cpf : String  <<unique, opcional>>
     +dateOfBirth : LocalDate  <<opcional>>
   }
 
-  class RestaurantOwner {
-    +restaurantName : String
+  class RestaurantOwnerDetails <<record>> {
+    +restaurantName : String  <<opcional>>
     +cnpj : String  <<unique, opcional>>
   }
 
@@ -39,19 +47,23 @@ package "Fase 1 — usuários" {
   }
 }
 
-package "Fase 2 — core.domain" {
+package "core.domain.usertype" {
   class UserType {
-    +id : Long  <<PK>>
+    +id : Long
     +name : String  <<unique, sem diferenciar maiúsculas>>
+    +profile : UserProfile  <<só nos tipos de sistema>>
     --
+    +isSystemType() : boolean
     +rename(newName) : UserType
   }
+}
 
+package "core.domain.restaurant / menuitem / shared" {
   class Restaurant {
-    +id : Long  <<PK>>
+    +id : Long
     +name : String
     +cuisineType : String
-    +ownerId : Long  <<FK users>>
+    +ownerId : Long
     --
     +update(...) : Restaurant
   }
@@ -65,8 +77,8 @@ package "Fase 2 — core.domain" {
   }
 
   class MenuItem {
-    +id : Long  <<PK>>
-    +restaurantId : Long  <<FK restaurants>>
+    +id : Long
+    +restaurantId : Long
     +name : String  <<unique no restaurante>>
     +description : String
     +price : BigDecimal  (> 0, 2 casas)
@@ -86,20 +98,21 @@ package "Fase 2 — core.domain" {
   }
 }
 
-User <|-- Customer : herança JOINED\n(PK = FK, 1:1)
-User <|-- RestaurantOwner : herança JOINED\n(PK = FK, 1:1)
-User *-- "0..1" Address : composição\n(colunas da tabela users)
-User ..> UserProfile : discriminador
-User "0..*" --> "0..1" UserType : assignedUserType\n(FK, RESTRICT)
-Restaurant "0..*" --> "1" User : dono\n(owner_id, RESTRICT)
-Restaurant *-- "1" Address : composição
+User *-- "1" ProfileDetails : dados do perfil
+ProfileDetails <|.. CustomerDetails
+ProfileDetails <|.. RestaurantOwnerDetails
+ProfileDetails ..> UserProfile
+User *-- "0..1" Address : endereço opcional
+User "0..*" --> "0..1" UserType : tipo\n(FK, RESTRICT)
+UserType ..> UserProfile : tipos de sistema
+Restaurant "0..*" --> "1" User : dono, só com o tipo de dono\n(owner_id, RESTRICT)
+Restaurant *-- "1" Address
 Restaurant *-- "1" OpeningHours
 Restaurant "1" *-- "0..*" MenuItem : cardápio\n(CASCADE)
 
 note bottom of User
-  Tabela base: users (colunas comuns + endereço embutido + user_type_id).
-  Tabelas filhas: customers, restaurant_owners
-  (FK para users, ON DELETE CASCADE).
-  No código, o enum UserProfile é domain.enums.UserType.
+  No banco, o perfil vira herança JOINED: users (colunas comuns,
+  endereço e user_type_id) + customers / restaurant_owners.
+  A tradução fica no UserJpaMapper, na infraestrutura.
 end note
 @enduml
