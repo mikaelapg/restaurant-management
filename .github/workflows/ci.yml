@@ -23,7 +23,23 @@ jobs:
           cache: maven
 
       - name: mvn verify (testes unitários, de integração e cobertura)
-        run: ./mvnw -B -ntp verify
+        run: |
+          set -o pipefail
+          ./mvnw -B -ntp verify 2>&1 | tee build.log
+
+      # Em caso de falha, publica as linhas de erro do Maven como anotações do check run,
+      # para que apareçam direto na aba Checks do GitHub sem abrir o log inteiro.
+      - name: Anotar erros do build
+        if: failure()
+        run: |
+          grep -E '\[ERROR\]|FAILURE|Tests run:.*(Failures: [1-9]|Errors: [1-9])|expected|but was|Exception' build.log \
+            | grep -v 'Re-run Maven\|Help 1\|full stack trace\|-e switch\|-X switch\|For more information\|http://cwiki' \
+            | head -400 > errors.txt || true
+          split -l 40 errors.txt part_
+          for f in $(ls part_* 2>/dev/null | head -10); do
+            msg=$(sed -e 's/%/%25/g' "$f" | awk 'BEGIN{ORS="%0A"} {print}')
+            echo "::error title=Build ($f)::${msg}"
+          done
 
       - name: Resumo da cobertura
         if: always()
