@@ -1,7 +1,7 @@
 {
  "info": {
   "name": "Sistema de Gestão de Restaurantes — API v1",
-  "description": "Coleção de testes da API de gestão de restaurantes.\n\nAs pastas estão na ordem em que devem rodar: cada uma depende do que a anterior cadastrou. Dá para rodar tudo de uma vez pelo Collection Runner ou pelo Newman.\n\nAs pastas 6 a 8 cobrem a Fase 2: tipos de usuário e a associação com os usuários, restaurantes e itens do cardápio. Elas limpam o que cadastram, para que a pasta 9 consiga excluir os usuários.\n\nOs ids de dono e cliente são capturados dos próprios cadastros, e cada execução gera e-mails, logins, CPF e CNPJ diferentes — então a coleção pode rodar várias vezes no mesmo banco sem esbarrar nas restrições de unicidade.\n\nAntes de rodar, suba a aplicação com `docker compose up -d --build`.",
+  "description": "Coleção de testes da API de gestão de restaurantes.\n\nAs pastas estão na ordem em que devem rodar: cada uma depende do que a anterior cadastrou. Dá para rodar tudo de uma vez pelo Collection Runner ou pelo Newman.\n\nAs pastas 6 a 8 cobrem a Fase 2: tipos de usuário e a associação com os usuários, restaurantes e itens do cardápio, incluindo as regras que ligam os dois cadastros: só quem tem o tipo \"Dono de Restaurante\" pode ser dono de um restaurante, os tipos de sistema não podem ser excluídos, e um tipo de sistema não pode ser dado a um usuário de outro perfil. Elas limpam o que cadastram, para que a pasta 9 consiga excluir os usuários.\n\nOs ids de dono e cliente são capturados dos próprios cadastros, e cada execução gera e-mails, logins, CPF e CNPJ diferentes — então a coleção pode rodar várias vezes no mesmo banco sem esbarrar nas restrições de unicidade.\n\nAntes de rodar, suba a aplicação com `docker compose up -d --build`.",
   "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
  },
  "item": [
@@ -73,7 +73,7 @@
          "",
          "pm.test(\"Devolve o dono cadastrado com id\", function () {",
          "    pm.expect(owner.id).to.be.a(\"number\");",
-         "    pm.expect(owner.userType).to.eql(\"RESTAURANT_OWNER\");",
+         "    pm.expect(owner.profile).to.eql(\"RESTAURANT_OWNER\");",
          "    pm.expect(owner.email).to.eql(pm.collectionVariables.get(\"owner_email\"));",
          "    pm.expect(owner.restaurantName).to.eql(\"Restaurante do João\");",
          "});",
@@ -137,7 +137,7 @@
          "",
          "pm.test(\"Devolve o cliente cadastrado com id\", function () {",
          "    pm.expect(customer.id).to.be.a(\"number\");",
-         "    pm.expect(customer.userType).to.eql(\"CUSTOMER\");",
+         "    pm.expect(customer.profile).to.eql(\"CUSTOMER\");",
          "    pm.expect(customer.email).to.eql(pm.collectionVariables.get(\"customer_email\"));",
          "});",
          "",
@@ -329,7 +329,7 @@
          "pm.test(\"Identifica o usuário autenticado\", function () {",
          "    pm.expect(body.id).to.eql(Number(pm.collectionVariables.get(\"owner_id\")));",
          "    pm.expect(body.login).to.eql(pm.collectionVariables.get(\"owner_login\"));",
-         "    pm.expect(body.userType).to.eql(\"RESTAURANT_OWNER\");",
+         "    pm.expect(body.profile).to.eql(\"RESTAURANT_OWNER\");",
          "});"
         ]
        }
@@ -378,7 +378,7 @@
          "});",
          "",
          "pm.test(\"Identifica o cliente\", function () {",
-         "    pm.expect(pm.response.json().userType).to.eql(\"CUSTOMER\");",
+         "    pm.expect(pm.response.json().profile).to.eql(\"CUSTOMER\");",
          "});"
         ]
        }
@@ -702,7 +702,7 @@
          "});",
          "",
          "pm.test(\"Traz os dois tipos de usuário na mesma consulta\", function () {",
-         "    const tipos = pm.response.json().content.map(u => u.userType);",
+         "    const tipos = pm.response.json().content.map(u => u.profile);",
          "    pm.expect(tipos).to.include(\"RESTAURANT_OWNER\");",
          "    pm.expect(tipos).to.include(\"CUSTOMER\");",
          "});"
@@ -754,7 +754,7 @@
       "method": "GET",
       "header": [],
       "url": {
-       "raw": "{{base_url}}/users?page=0&size=1&sort=name,asc",
+       "raw": "{{base_url}}/users?page=0&size=1",
        "host": [
         "{{base_url}}"
        ],
@@ -769,10 +769,6 @@
         {
          "key": "size",
          "value": "1"
-        },
-        {
-         "key": "sort",
-         "value": "name,asc"
         }
        ]
       }
@@ -1573,7 +1569,13 @@
          "    pm.expect(nomes).to.include(\"cliente\");",
          "});",
          "",
-         "pm.collectionVariables.set(\"customer_type_id\", tipos.find(t => t.name.toLowerCase() === \"cliente\").id);"
+         "pm.test(\"Os dois padrões são tipos de sistema, ligados a um perfil\", function () {",
+         "    const sistema = tipos.filter(t => t.systemType);",
+         "    pm.expect(sistema.map(t => t.profile)).to.have.members([\"RESTAURANT_OWNER\", \"CUSTOMER\"]);",
+         "});",
+         "",
+         "pm.collectionVariables.set(\"owner_type_id\", tipos.find(t => t.profile === \"RESTAURANT_OWNER\").id);",
+         "pm.collectionVariables.set(\"customer_type_id\", tipos.find(t => t.profile === \"CUSTOMER\").id);"
         ]
        }
       }
@@ -1606,8 +1608,8 @@
          "    pm.response.to.have.status(200);",
          "});",
          "",
-         "pm.test(\"assignedUserType é Dono de Restaurante\", function () {",
-         "    pm.expect(pm.response.json().assignedUserType.name.toLowerCase()).to.eql(\"dono de restaurante\");",
+         "pm.test(\"userType é Dono de Restaurante\", function () {",
+         "    pm.expect(pm.response.json().userType.name.toLowerCase()).to.eql(\"dono de restaurante\");",
          "});"
         ]
        }
@@ -1899,7 +1901,7 @@
          "pm.test(\"O cliente passa a ter o novo tipo\", function () {",
          "    const usuario = pm.response.json();",
          "    pm.expect(usuario.id).to.eql(Number(pm.collectionVariables.get(\"customer_id\")));",
-         "    pm.expect(usuario.assignedUserType.id).to.eql(Number(pm.collectionVariables.get(\"user_type_id\")));",
+         "    pm.expect(usuario.userType.id).to.eql(Number(pm.collectionVariables.get(\"user_type_id\")));",
          "});"
         ]
        }
@@ -2042,6 +2044,91 @@
      ]
     },
     {
+     "name": "Exclusão recusada: tipo de sistema (409)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/user-types/{{customer_type_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types",
+        "{{customer_type_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409 Conflict\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/system-user-type\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Associação recusada: tipo Cliente para um dono (422)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/users/{{owner_id}}/user-type",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "{{owner_id}}",
+        "user-type"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"userTypeId\": {{customer_type_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 422 Unprocessable Entity\", function () {",
+         "    pm.response.to.have.status(422);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/incompatible-user-type\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
      "name": "Devolver o cliente ao tipo Cliente (200)",
      "request": {
       "method": "PUT",
@@ -2084,7 +2171,7 @@
          "});",
          "",
          "pm.test(\"Volta a ser Cliente\", function () {",
-         "    pm.expect(pm.response.json().assignedUserType.name.toLowerCase()).to.eql(\"cliente\");",
+         "    pm.expect(pm.response.json().userType.name.toLowerCase()).to.eql(\"cliente\");",
          "});"
         ]
        }
@@ -2265,6 +2352,58 @@
          "",
          "pm.test(\"Erro no formato ProblemDetail\", function () {",
          "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-not-found\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: cliente como dono (422)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Restaurante do Cliente {{run_id}}\",\n  \"address\": {\n    \"street\": \"Rua Augusta\",\n    \"number\": \"1500\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01305-100\"\n  },\n  \"cuisineType\": \"Italiana\",\n  \"openingHours\": {\"opensAt\": \"11:00\", \"closesAt\": \"23:00\"},\n  \"ownerId\": {{customer_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 422 Unprocessable Entity\", function () {",
+         "    pm.response.to.have.status(422);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/invalid-restaurant-owner\");",
+         "});",
+         "",
+         "pm.test(\"A mensagem diz o tipo atual do usuário\", function () {",
+         "    pm.expect(pm.response.json().detail).to.include(\"Cliente\");",
          "});"
         ]
        }
@@ -2550,6 +2689,137 @@
          "",
          "pm.test(\"Erro no formato ProblemDetail\", function () {",
          "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-owns-restaurants\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastrar tipo auxiliar \"Gerente\" (201)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/user-types",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Gerente {{run_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 201 Created\", function () {",
+         "    pm.response.to.have.status(201);",
+         "});",
+         "",
+         "pm.test(\"Não é tipo de sistema\", function () {",
+         "    pm.expect(pm.response.json().systemType).to.eql(false);",
+         "});",
+         "",
+         "pm.collectionVariables.set(\"aux_type_id\", pm.response.json().id);"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Troca de tipo recusada: dono com restaurante (409)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/users/{{owner_id}}/user-type",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "{{owner_id}}",
+        "user-type"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"userTypeId\": {{aux_type_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409 Conflict\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-type-change-not-allowed\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Excluir tipo auxiliar (204)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/user-types/{{aux_type_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types",
+        "{{aux_type_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 204 No Content\", function () {",
+         "    pm.response.to.have.status(204);",
          "});"
         ]
        }
@@ -3364,6 +3634,14 @@
    "key": "menu_item_id",
    "value": "",
    "type": "string"
+  },
+  {
+   "key": "owner_type_id",
+   "value": ""
+  },
+  {
+   "key": "aux_type_id",
+   "value": ""
   }
  ]
 }
