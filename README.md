@@ -1,5 +1,7 @@
 # Sistema de Gestão de Restaurantes
 
+[![CI](https://github.com/mikaelapg/restaurant-management/actions/workflows/ci.yml/badge.svg)](https://github.com/mikaelapg/restaurant-management/actions/workflows/ci.yml)
+
 API REST para o sistema compartilhado de gestão de restaurantes do Tech Challenge.
 
 - **Fase 1:** cadastro e manutenção dos dois perfis de usuário, dono de restaurante e
@@ -467,8 +469,8 @@ O modelo de domínio está em [`docs/domain-model.mmd`](docs/domain-model.mmd) (
 ## Testes
 
 ```bash
-./mvnw test      # testes unitários (JUnit 5 + Mockito) e relatório do JaCoCo
-./mvnw verify    # + testes de integração com Testcontainers (exige Docker) e checagem de cobertura
+./mvnw test      # 239 testes unitários (JUnit 5 + Mockito) e relatório do JaCoCo
+./mvnw verify    # + 26 testes de integração com Testcontainers (exige Docker) e checagem de cobertura
 ```
 
 **Testes unitários**, sem banco e sem subir a aplicação:
@@ -499,8 +501,13 @@ do HTTP ao banco.
 
 Sem Docker disponível, as classes de integração são ignoradas sem quebrar o build.
 
-**Cobertura** pelo JaCoCo (relatório em `target/site/jacoco/index.html` após `mvn test`). O
-`mvn verify` falha se a cobertura de linhas ficar abaixo de 80%. O código gerado pelo Lombok
+**Cobertura** pelo JaCoCo (relatório em `target/site/jacoco/index.html` após `mvn test`):
+99,4% das linhas na suíte unitária. O `mvn verify` falha se a cobertura de linhas ficar
+abaixo de 80%.
+
+**Integração contínua.** O GitHub Actions (`.github/workflows/ci.yml`) roda o
+`mvn verify` completo a cada push e pull request, com os testes de integração contra
+PostgreSQL, e publica a cobertura e os relatórios de teste. O código gerado pelo Lombok
 fica fora da conta (`lombok.config`).
 
 ## Coleção Postman
