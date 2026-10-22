@@ -1,11 +1,17 @@
 package com.restaurant.management.core.application.usertype;
 
+import com.restaurant.management.core.application.exception.SystemUserTypeException;
 import com.restaurant.management.core.application.exception.UserTypeAlreadyExistsException;
+import com.restaurant.management.core.application.exception.UserTypeChangeNotAllowedException;
 import com.restaurant.management.core.application.exception.UserTypeNotFoundException;
 import com.restaurant.management.core.application.exception.UserNotFoundException;
 import com.restaurant.management.core.application.exception.UserTypeInUseException;
+import com.restaurant.management.core.application.restaurant.RestaurantGateway;
 import com.restaurant.management.core.application.user.UserGateway;
+import com.restaurant.management.core.domain.exception.IncompatibleUserTypeException;
+import com.restaurant.management.core.domain.user.User;
 import com.restaurant.management.core.domain.usertype.UserType;
+import com.restaurant.management.support.Fixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -118,6 +124,19 @@ class UserTypeUseCasesTest {
     class Update {
 
         @Test
+        @DisplayName("renomeia um tipo de sistema sem perder o perfil")
+        void shouldRenameSystemTypeKeepingProfile() {
+            when(gateway.findById(2L)).thenReturn(Optional.of(Fixtures.CUSTOMER_TYPE));
+            when(gateway.findByNameIgnoreCase("Consumidor")).thenReturn(Optional.empty());
+            when(gateway.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+            UserType result = new UpdateUserTypeUseCase(gateway).execute(2L, "Consumidor");
+
+            assertThat(result.getName()).isEqualTo("Consumidor");
+            assertThat(result.isSystemType()).isTrue();
+        }
+
+        @Test
         @DisplayName("renomeia mantendo o id")
         void shouldRename() {
             when(gateway.findById(1L)).thenReturn(Optional.of(saved(1L, "Cliente")));
@@ -187,6 +206,18 @@ class UserTypeUseCasesTest {
         }
 
         @Test
+        @DisplayName("recusa excluir um tipo de sistema, mesmo sem usuários")
+        void shouldRefuseSystemType() {
+            when(gateway.findById(1L)).thenReturn(Optional.of(Fixtures.OWNER_TYPE));
+
+            assertThatThrownBy(() -> new DeleteUserTypeUseCase(gateway, userGateway).execute(1L))
+                    .isInstanceOf(SystemUserTypeException.class)
+                    .hasMessageContaining("Dono de Restaurante");
+            verify(gateway, never()).deleteById(any());
+            verify(userGateway, never()).existsByUserTypeId(any());
+        }
+
+        @Test
         @DisplayName("recusa excluir um tipo associado a algum usuário")
         void shouldRefuseWhenInUse() {
             when(gateway.findById(1L)).thenReturn(Optional.of(saved(1L, "Cliente")));
@@ -202,36 +233,92 @@ class UserTypeUseCasesTest {
     @DisplayName("Associar a um usuário")
     class Assign {
 
+        @Mock
+        private RestaurantGateway restaurantGateway;
+
+        private AssignUserTypeUseCase useCase() {
+            return new AssignUserTypeUseCase(userGateway, gateway, restaurantGateway);
+        }
+
         @Test
-        @DisplayName("associa quando usuário e tipo existem")
+        @DisplayName("associa quando usuário e tipo existem e devolve o usuário com o tipo novo")
         void shouldAssign() {
-            when(userGateway.existsById(10L)).thenReturn(true);
-            when(gateway.findById(1L)).thenReturn(Optional.of(saved(1L, "Cliente")));
+            when(userGateway.findById(10L)).thenReturn(Optional.of(Fixtures.customer(10L)));
+            when(gateway.findById(3L)).thenReturn(Optional.of(Fixtures.CUSTOM_TYPE));
+            when(userGateway.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-            new AssignUserTypeUseCase(userGateway, gateway).execute(10L, 1L);
+            User result = useCase().execute(10L, 3L);
 
-            verify(userGateway).assignUserType(10L, 1L);
+            assertThat(result.getUserType()).isEqualTo(Fixtures.CUSTOM_TYPE);
+            verify(userGateway).save(result);
         }
 
         @Test
         @DisplayName("lança usuário não encontrado e não associa nada")
         void shouldThrowWhenUserIsMissing() {
-            when(userGateway.existsById(10L)).thenReturn(false);
+            when(userGateway.findById(10L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> new AssignUserTypeUseCase(userGateway, gateway).execute(10L, 1L))
+            assertThatThrownBy(() -> useCase().execute(10L, 1L))
                     .isInstanceOf(UserNotFoundException.class);
-            verify(userGateway, never()).assignUserType(any(), any());
+            verify(userGateway, never()).save(any());
         }
 
         @Test
         @DisplayName("lança tipo não encontrado e não associa nada")
         void shouldThrowWhenUserTypeIsMissing() {
-            when(userGateway.existsById(10L)).thenReturn(true);
+            when(userGateway.findById(10L)).thenReturn(Optional.of(Fixtures.customer(10L)));
             when(gateway.findById(99L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> new AssignUserTypeUseCase(userGateway, gateway).execute(10L, 99L))
+            assertThatThrownBy(() -> useCase().execute(10L, 99L))
                     .isInstanceOf(UserTypeNotFoundException.class);
-            verify(userGateway, never()).assignUserType(any(), any());
+            verify(userGateway, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("recusa dar o tipo de sistema \"Cliente\" a um dono de restaurante")
+        void shouldRejectSystemTypeOfAnotherProfile() {
+            when(userGateway.findById(10L)).thenReturn(Optional.of(Fixtures.owner(10L)));
+            when(gateway.findById(2L)).thenReturn(Optional.of(Fixtures.CUSTOMER_TYPE));
+
+            assertThatThrownBy(() -> useCase().execute(10L, 2L))
+                    .isInstanceOf(IncompatibleUserTypeException.class)
+                    .hasMessageContaining("Cliente");
+            verify(userGateway, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("recusa tirar o tipo de dono de quem é responsável por restaurantes")
+        void shouldRejectWhenOwnerHasRestaurants() {
+            when(userGateway.findById(10L)).thenReturn(Optional.of(Fixtures.owner(10L)));
+            when(gateway.findById(3L)).thenReturn(Optional.of(Fixtures.CUSTOM_TYPE));
+            when(restaurantGateway.existsByOwnerId(10L)).thenReturn(true);
+
+            assertThatThrownBy(() -> useCase().execute(10L, 3L))
+                    .isInstanceOf(UserTypeChangeNotAllowedException.class)
+                    .hasMessageContaining("10");
+            verify(userGateway, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("deixa o dono sem restaurantes trocar para outro tipo")
+        void shouldAllowOwnerWithoutRestaurantsToChange() {
+            when(userGateway.findById(10L)).thenReturn(Optional.of(Fixtures.owner(10L)));
+            when(gateway.findById(3L)).thenReturn(Optional.of(Fixtures.CUSTOM_TYPE));
+            when(restaurantGateway.existsByOwnerId(10L)).thenReturn(false);
+            when(userGateway.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+            assertThat(useCase().execute(10L, 3L).canOwnRestaurants()).isFalse();
+        }
+
+        @Test
+        @DisplayName("devolve o tipo de dono a um dono sem conferir restaurantes")
+        void shouldRestoreOwnerTypeWithoutCheckingRestaurants() {
+            when(userGateway.findById(10L)).thenReturn(Optional.of(Fixtures.owner(10L, Fixtures.CUSTOM_TYPE)));
+            when(gateway.findById(1L)).thenReturn(Optional.of(Fixtures.OWNER_TYPE));
+            when(userGateway.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+            assertThat(useCase().execute(10L, 1L).canOwnRestaurants()).isTrue();
+            verify(restaurantGateway, never()).existsByOwnerId(any());
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.restaurant.management.infrastructure.web.restaurant;
 
+import com.restaurant.management.core.application.exception.InvalidRestaurantOwnerException;
 import com.restaurant.management.core.application.exception.RestaurantNotFoundException;
 import com.restaurant.management.core.application.exception.UserNotFoundException;
 import com.restaurant.management.core.application.pagination.PageQuery;
@@ -140,6 +141,17 @@ class RestaurantControllerTest {
         mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-not-found"));
+    }
+
+    @Test
+    @DisplayName("POST com um cliente como dono responde 422 invalid-restaurant-owner")
+    void shouldReturnUnprocessableForCustomerAsOwner() throws Exception {
+        when(createRestaurant.execute(any())).thenThrow(new InvalidRestaurantOwnerException(1L, "Cliente"));
+
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/invalid-restaurant-owner"))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("'Cliente'")));
     }
 
     @Test

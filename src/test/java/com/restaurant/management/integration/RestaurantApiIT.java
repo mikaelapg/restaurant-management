@@ -1,7 +1,8 @@
 package com.restaurant.management.integration;
 
-import com.restaurant.management.domain.repository.UserRepository;
+import com.restaurant.management.infrastructure.persistence.user.UserJpaRepository;
 import com.restaurant.management.infrastructure.persistence.restaurant.RestaurantJpaRepository;
+import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,7 +60,10 @@ class RestaurantApiIT {
     private RestaurantJpaRepository restaurantRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserJpaRepository userRepository;
+
+    @Autowired
+    private UserTypeJpaRepository userTypeRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -70,6 +74,7 @@ class RestaurantApiIT {
     void setUp() throws Exception {
         restaurantRepository.deleteAll();
         userRepository.deleteAll();
+        userTypeRepository.deleteAll(userTypeRepository.findAll().stream().filter(t -> t.getProfile() == null).toList());
         mockMvc.perform(post("/api/v1/restaurant-owners").contentType(MediaType.APPLICATION_JSON).content("""
                         {"name": "Giulia Rossi", "email": "giulia@it.com", "login": "giulia.it", "password": "Senha@123"}
                         """))
@@ -144,6 +149,42 @@ class RestaurantApiIT {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-not-found"));
         assertThat(restaurantRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("cliente não pode ser dono de restaurante: 422 e nada é gravado")
+    void shouldRejectCustomerAsOwner() throws Exception {
+        mockMvc.perform(post("/api/v1/customers").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"name": "Maria", "email": "maria@it.com", "login": "maria.it", "password": "Senha@123"}
+                        """))
+                .andExpect(status().isCreated());
+        Long customerId = userRepository.findByLoginIgnoreCase("maria.it").orElseThrow().getId();
+
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("X", "Y", customerId)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/invalid-restaurant-owner"));
+        assertThat(restaurantRepository.count()).isZero();
+
+        Long id = create("Cantina", "Italiana");
+        mockMvc.perform(put(BASE + "/" + id).contentType(MediaType.APPLICATION_JSON)
+                        .content(body("Cantina", "Italiana", customerId)))
+                .andExpect(status().isUnprocessableEntity());
+        assertThat(restaurantRepository.findById(id).orElseThrow().getOwnerId()).isEqualTo(ownerId);
+    }
+
+    @Test
+    @DisplayName("dono com restaurantes não pode perder o tipo de dono")
+    void shouldRefuseTypeChangeOfOwnerWithRestaurants() throws Exception {
+        create("Cantina", "Italiana");
+        mockMvc.perform(post("/api/v1/user-types").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Gerente\"}"))
+                .andExpect(status().isCreated());
+        Long managerTypeId = userTypeRepository.findByNameIgnoreCase("Gerente").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/v1/users/" + ownerId + "/user-type").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userTypeId\": " + managerTypeId + "}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-type-change-not-allowed"));
     }
 
     @Test

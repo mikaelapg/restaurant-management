@@ -1,4 +1,4 @@
-package com.restaurant.management.exception;
+package com.restaurant.management.infrastructure.web.exception;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

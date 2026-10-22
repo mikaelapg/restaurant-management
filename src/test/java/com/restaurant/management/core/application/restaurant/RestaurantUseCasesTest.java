@@ -1,6 +1,7 @@
 package com.restaurant.management.core.application.restaurant;
 
 import com.restaurant.management.core.application.exception.RestaurantNotFoundException;
+import com.restaurant.management.core.application.exception.InvalidRestaurantOwnerException;
 import com.restaurant.management.core.application.exception.UserNotFoundException;
 import com.restaurant.management.core.application.pagination.PageQuery;
 import com.restaurant.management.core.application.pagination.PageResult;
@@ -8,6 +9,7 @@ import com.restaurant.management.core.application.user.UserGateway;
 import com.restaurant.management.core.domain.restaurant.OpeningHours;
 import com.restaurant.management.core.domain.restaurant.Restaurant;
 import com.restaurant.management.core.domain.shared.Address;
+import com.restaurant.management.support.Fixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -55,7 +57,7 @@ class RestaurantUseCasesTest {
         @Test
         @DisplayName("salva quando o dono existe")
         void shouldSave() {
-            when(userGateway.existsById(1L)).thenReturn(true);
+            when(userGateway.findById(1L)).thenReturn(Optional.of(Fixtures.owner(1L)));
             when(gateway.save(any())).thenReturn(saved(10L));
 
             Restaurant result = new CreateRestaurantUseCase(gateway, userGateway).execute(command(1L));
@@ -70,11 +72,58 @@ class RestaurantUseCasesTest {
         @Test
         @DisplayName("lança usuário não encontrado e não salva quando o dono não existe")
         void shouldRejectMissingOwner() {
-            when(userGateway.existsById(9L)).thenReturn(false);
+            when(userGateway.findById(9L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> new CreateRestaurantUseCase(gateway, userGateway).execute(command(9L)))
                     .isInstanceOf(UserNotFoundException.class)
                     .hasMessageContaining("9");
+            verify(gateway, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Dono precisa ser do tipo dono de restaurante")
+    class OwnerRule {
+
+        @Test
+        @DisplayName("recusa cadastrar com um cliente como dono, sem salvar")
+        void shouldRejectCustomerAsOwnerOnCreate() {
+            when(userGateway.findById(5L)).thenReturn(Optional.of(Fixtures.customer(5L)));
+
+            assertThatThrownBy(() -> new CreateRestaurantUseCase(gateway, userGateway).execute(command(5L)))
+                    .isInstanceOf(InvalidRestaurantOwnerException.class)
+                    .hasMessageContaining("'Cliente'");
+            verify(gateway, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("recusa dono cujo tipo foi trocado por um tipo comum")
+        void shouldRejectOwnerWithCustomType() {
+            when(userGateway.findById(5L)).thenReturn(Optional.of(Fixtures.owner(5L, Fixtures.CUSTOM_TYPE)));
+
+            assertThatThrownBy(() -> new CreateRestaurantUseCase(gateway, userGateway).execute(command(5L)))
+                    .isInstanceOf(InvalidRestaurantOwnerException.class)
+                    .hasMessageContaining("'Gerente'");
+        }
+
+        @Test
+        @DisplayName("recusa dono sem tipo associado")
+        void shouldRejectOwnerWithoutType() {
+            when(userGateway.findById(5L)).thenReturn(Optional.of(Fixtures.owner(5L, null)));
+
+            assertThatThrownBy(() -> new CreateRestaurantUseCase(gateway, userGateway).execute(command(5L)))
+                    .isInstanceOf(InvalidRestaurantOwnerException.class)
+                    .hasMessageContaining("nenhum");
+        }
+
+        @Test
+        @DisplayName("recusa passar o restaurante para um cliente, sem salvar")
+        void shouldRejectCustomerAsOwnerOnUpdate() {
+            when(gateway.findById(10L)).thenReturn(Optional.of(saved(10L)));
+            when(userGateway.findById(5L)).thenReturn(Optional.of(Fixtures.customer(5L)));
+
+            assertThatThrownBy(() -> new UpdateRestaurantUseCase(gateway, userGateway).execute(10L, command(5L)))
+                    .isInstanceOf(InvalidRestaurantOwnerException.class);
             verify(gateway, never()).save(any());
         }
     }
@@ -119,7 +168,7 @@ class RestaurantUseCasesTest {
         @DisplayName("salva os dados novos mantendo o id")
         void shouldUpdate() {
             when(gateway.findById(10L)).thenReturn(Optional.of(saved(10L)));
-            when(userGateway.existsById(2L)).thenReturn(true);
+            when(userGateway.findById(2L)).thenReturn(Optional.of(Fixtures.owner(2L)));
             when(gateway.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
             Restaurant result = new UpdateRestaurantUseCase(gateway, userGateway)
@@ -144,7 +193,7 @@ class RestaurantUseCasesTest {
         @DisplayName("lança usuário não encontrado quando o novo dono não existe")
         void shouldThrowWhenOwnerIsMissing() {
             when(gateway.findById(10L)).thenReturn(Optional.of(saved(10L)));
-            when(userGateway.existsById(9L)).thenReturn(false);
+            when(userGateway.findById(9L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> new UpdateRestaurantUseCase(gateway, userGateway).execute(10L, command(9L)))
                     .isInstanceOf(UserNotFoundException.class);

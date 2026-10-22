@@ -1,6 +1,8 @@
 package com.restaurant.management.integration;
 
-import com.restaurant.management.domain.repository.UserRepository;
+import com.restaurant.management.core.domain.user.UserProfile;
+import com.restaurant.management.core.domain.usertype.UserType;
+import com.restaurant.management.infrastructure.persistence.user.UserJpaRepository;
 import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaEntity;
 import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,8 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Integração de ponta a ponta do CRUD de tipos de usuário: HTTP, casos de uso,
- * gateway JPA, migration Flyway e PostgreSQL real, tudo junto.
+ * Integração de ponta a ponta do CRUD de tipos de usuário e da associação com usuários:
+ * HTTP, casos de uso, gateway JPA, migrations Flyway e PostgreSQL real, tudo junto.
  * <p>
  * Os testes unitários provam cada peça isolada; este prova que as peças se encaixam.
  * Roda em {@code mvn verify} e precisa de Docker.
@@ -40,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = NONE)
-@DisplayName("Integração — CRUD de tipos de usuário (PostgreSQL real)")
+@DisplayName("Integração — tipos de usuário (PostgreSQL real)")
 class UserTypeApiIT {
 
     private static final String BASE = "/api/v1/user-types";
@@ -62,99 +64,131 @@ class UserTypeApiIT {
     private UserTypeJpaRepository repository;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserJpaRepository userRepository;
 
     /**
-     * Antes de cada teste, e não depois: a migration V3 já cadastra "Dono de Restaurante"
-     * e "Cliente", e os testes partem de uma tabela vazia. Os usuários saem primeiro
-     * porque a FK impede excluir um tipo em uso.
+     * Antes de cada teste: tira os usuários e os tipos criados pela API, e devolve os nomes
+     * originais aos tipos de sistema, que as migrations cadastram e nunca saem.
      */
     @BeforeEach
     void cleanUp() {
         userRepository.deleteAll();
-        repository.deleteAll();
+        repository.deleteAll(repository.findAll().stream().filter(type -> type.getProfile() == null).toList());
+        repository.findAll().forEach(type -> {
+            type.setName(type.getProfile() == UserProfile.RESTAURANT_OWNER ? UserType.RESTAURANT_OWNER : UserType.CUSTOMER);
+            repository.save(type);
+        });
     }
 
     private static String body(String name) {
         return "{\"name\": \"" + name + "\"}";
     }
 
+    private Long idOf(String name) {
+        return repository.findByNameIgnoreCase(name).orElseThrow().getId();
+    }
+
     @Test
-    @DisplayName("ciclo completo: cria, busca, lista, renomeia e exclui")
-    void shouldRunFullCrud() throws Exception {
-        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("Cliente")))
-                .andExpect(status().isCreated());
-        Long id = repository.findByNameIgnoreCase("Cliente").orElseThrow().getId();
-
-        mockMvc.perform(get(BASE + "/" + id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Cliente"));
-
-        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("Administrador")))
-                .andExpect(status().isCreated());
+    @DisplayName("as migrations cadastram \"Dono de Restaurante\" e \"Cliente\" como tipos de sistema")
+    void shouldSeedSystemTypes() throws Exception {
         mockMvc.perform(get(BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Administrador"))
-                .andExpect(jsonPath("$[1].name").value("Cliente"));
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].name").value("Cliente"))
+                .andExpect(jsonPath("$[0].systemType").value(true))
+                .andExpect(jsonPath("$[0].profile").value("CUSTOMER"))
+                .andExpect(jsonPath("$[1].name").value("Dono de Restaurante"))
+                .andExpect(jsonPath("$[1].profile").value("RESTAURANT_OWNER"));
+    }
 
-        mockMvc.perform(put(BASE + "/" + id).contentType(MediaType.APPLICATION_JSON).content(body("Consumidor")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Consumidor"));
-        assertThat(repository.findById(id).orElseThrow().getName()).isEqualTo("Consumidor");
+    @Test
+    @DisplayName("ciclo completo de um tipo criado pela API: cria, busca, lista, renomeia e exclui")
+    void shouldRunFullCrud() throws Exception {
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("Gerente")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.systemType").value(false));
+        Long id = idOf("Gerente");
 
-        mockMvc.perform(delete(BASE + "/" + id))
-                .andExpect(status().isNoContent());
         mockMvc.perform(get(BASE + "/" + id))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Gerente"));
+        mockMvc.perform(get(BASE))
+                .andExpect(jsonPath("$[1].name").value("Dono de Restaurante"))
+                .andExpect(jsonPath("$[2].name").value("Gerente"));
+
+        mockMvc.perform(put(BASE + "/" + id).contentType(MediaType.APPLICATION_JSON).content(body("Supervisor")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Supervisor"));
+        assertThat(repository.findById(id).orElseThrow().getName()).isEqualTo("Supervisor");
+
+        mockMvc.perform(delete(BASE + "/" + id)).andExpect(status().isNoContent());
+        mockMvc.perform(get(BASE + "/" + id)).andExpect(status().isNotFound());
     }
 
     @Test
     @DisplayName("nome repetido com outra capitalização responde 409")
     void shouldRejectDuplicateIgnoringCase() throws Exception {
-        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("Cliente")))
-                .andExpect(status().isCreated());
-
         mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("CLIENTE")))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-type-conflict"));
     }
 
     @Test
-    @DisplayName("o índice do banco barra duplicatas mesmo se o caso de uso for contornado")
-    void shouldEnforceUniquenessInDatabase() {
-        repository.saveAndFlush(new UserTypeJpaEntity(null, "Cliente"));
+    @DisplayName("tipo de sistema pode ser renomeado, continua ligado ao perfil e não pode ser excluído")
+    void shouldProtectSystemTypes() throws Exception {
+        Long clienteId = idOf("Cliente");
 
-        assertThatThrownBy(() -> repository.saveAndFlush(new UserTypeJpaEntity(null, "cliente")))
-                .isInstanceOf(DataIntegrityViolationException.class);
-    }
-
-    @Test
-    @DisplayName("associação: cliente nasce com o tipo Cliente, troca de tipo e tipo em uso não pode ser excluído")
-    void shouldAssociateUsersWithUserTypes() throws Exception {
-        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("Cliente")))
-                .andExpect(status().isCreated());
-        Long clienteId = repository.findByNameIgnoreCase("Cliente").orElseThrow().getId();
+        mockMvc.perform(put(BASE + "/" + clienteId).contentType(MediaType.APPLICATION_JSON).content(body("Consumidor")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profile").value("CUSTOMER"));
 
         mockMvc.perform(post("/api/v1/customers").contentType(MediaType.APPLICATION_JSON).content("""
                         {"name": "Maria", "email": "maria@it.com", "login": "maria.it", "password": "Senha@123"}
                         """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.assignedUserType.id").value(clienteId))
-                .andExpect(jsonPath("$.assignedUserType.name").value("Cliente"));
-        Long userId = userRepository.findByLoginIgnoreCase("maria.it").orElseThrow().getId();
+                .andExpect(jsonPath("$.userType.name").value("Consumidor"));
+
+        mockMvc.perform(delete(BASE + "/" + clienteId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/system-user-type"));
+    }
+
+    @Test
+    @DisplayName("o índice do banco barra duplicatas mesmo se o caso de uso for contornado")
+    void shouldEnforceUniquenessInDatabase() {
+        repository.saveAndFlush(new UserTypeJpaEntity(null, "Gerente"));
+
+        assertThatThrownBy(() -> repository.saveAndFlush(new UserTypeJpaEntity(null, "gerente")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("associação: troca para tipo comum, tipo em uso não sai e tipo de outro perfil é recusado")
+    void shouldAssociateUsersWithUserTypes() throws Exception {
+        mockMvc.perform(post("/api/v1/customers").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"name": "Maria", "email": "maria@it.com", "login": "maria.it", "password": "Senha@123"}
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userType.id").value(idOf("Cliente")));
+        Long customerId = userRepository.findByLoginIgnoreCase("maria.it").orElseThrow().getId();
 
         mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(body("Cliente VIP")))
                 .andExpect(status().isCreated());
-        Long vipId = repository.findByNameIgnoreCase("Cliente VIP").orElseThrow().getId();
+        Long vipId = idOf("Cliente VIP");
 
-        mockMvc.perform(put("/api/v1/users/" + userId + "/user-type")
+        mockMvc.perform(put("/api/v1/users/" + customerId + "/user-type")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"userTypeId\": " + vipId + "}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.assignedUserType.name").value("Cliente VIP"));
+                .andExpect(jsonPath("$.userType.name").value("Cliente VIP"));
 
         mockMvc.perform(delete(BASE + "/" + vipId))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-type-in-use"));
-        mockMvc.perform(delete(BASE + "/" + clienteId))
-                .andExpect(status().isNoContent());
+
+        mockMvc.perform(put("/api/v1/users/" + customerId + "/user-type")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userTypeId\": " + idOf("Dono de Restaurante") + "}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/incompatible-user-type"));
     }
 }

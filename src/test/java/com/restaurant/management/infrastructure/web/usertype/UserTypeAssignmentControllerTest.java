@@ -1,11 +1,10 @@
 package com.restaurant.management.infrastructure.web.usertype;
 
 import com.restaurant.management.core.application.exception.UserNotFoundException;
+import com.restaurant.management.core.application.exception.UserTypeChangeNotAllowedException;
 import com.restaurant.management.core.application.exception.UserTypeNotFoundException;
 import com.restaurant.management.core.application.usertype.AssignUserTypeUseCase;
-import com.restaurant.management.domain.enums.UserType;
-import com.restaurant.management.dto.response.UserResponse;
-import com.restaurant.management.service.UserService;
+import com.restaurant.management.core.domain.exception.IncompatibleUserTypeException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,10 +13,9 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDateTime;
-
+import static com.restaurant.management.support.Fixtures.CUSTOM_TYPE;
+import static com.restaurant.management.support.Fixtures.customer;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -29,29 +27,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class UserTypeAssignmentControllerTest {
 
     private static final String URL = "/api/v1/users/10/user-type";
+    private static final String BODY = "{\"userTypeId\": 3}";
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockBean
     private AssignUserTypeUseCase assignUserType;
-    @MockBean
-    private UserService userService;
 
     @Test
     @DisplayName("PUT associa e devolve o usuário com o tipo novo")
     void shouldAssign() throws Exception {
-        when(userService.findById(10L)).thenReturn(new UserResponse(10L, UserType.CUSTOMER, "Maria",
-                "maria@email.com", "maria", LocalDateTime.of(2026, 10, 1, 12, 0), null,
-                new UserTypeResponse(3L, "Cliente VIP")));
+        when(assignUserType.execute(10L, 3L)).thenReturn(customer(10L, CUSTOM_TYPE));
 
-        mockMvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content("{\"userTypeId\": 3}"))
+        mockMvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(10))
-                .andExpect(jsonPath("$.assignedUserType.id").value(3))
-                .andExpect(jsonPath("$.assignedUserType.name").value("Cliente VIP"));
-
-        verify(assignUserType).execute(10L, 3L);
+                .andExpect(jsonPath("$.profile").value("CUSTOMER"))
+                .andExpect(jsonPath("$.userType.id").value(3))
+                .andExpect(jsonPath("$.userType.name").value("Gerente"))
+                .andExpect(jsonPath("$.userType.systemType").value(false));
     }
 
     @Test
@@ -65,22 +60,36 @@ class UserTypeAssignmentControllerTest {
     }
 
     @Test
-    @DisplayName("PUT com usuário inexistente responde 404 user-not-found")
-    void shouldReturnNotFoundForUser() throws Exception {
-        doThrow(new UserNotFoundException(10L)).when(assignUserType).execute(10L, 3L);
-
-        mockMvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content("{\"userTypeId\": 3}"))
+    @DisplayName("PUT com usuário ou tipo inexistente responde 404 com o type de cada um")
+    void shouldReturnNotFound() throws Exception {
+        when(assignUserType.execute(10L, 3L)).thenThrow(new UserNotFoundException(10L));
+        mockMvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-not-found"));
+
+        doThrow(new UserTypeNotFoundException(3L)).when(assignUserType).execute(10L, 3L);
+        mockMvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-type-not-found"));
     }
 
     @Test
-    @DisplayName("PUT com tipo inexistente responde 404 user-type-not-found")
-    void shouldReturnNotFoundForUserType() throws Exception {
-        doThrow(new UserTypeNotFoundException(3L)).when(assignUserType).execute(10L, 3L);
+    @DisplayName("PUT com tipo de sistema de outro perfil responde 422")
+    void shouldReturnUnprocessableForIncompatibleType() throws Exception {
+        when(assignUserType.execute(10L, 3L)).thenThrow(new IncompatibleUserTypeException("incompatível"));
 
-        mockMvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content("{\"userTypeId\": 3}"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-type-not-found"));
+        mockMvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/incompatible-user-type"));
+    }
+
+    @Test
+    @DisplayName("PUT que tiraria o tipo de dono de quem tem restaurantes responde 409")
+    void shouldReturnConflictWhenOwnerHasRestaurants() throws Exception {
+        when(assignUserType.execute(10L, 3L)).thenThrow(new UserTypeChangeNotAllowedException(10L));
+
+        mockMvc.perform(put(URL).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://restaurant-api.com/errors/user-type-change-not-allowed"));
     }
 }

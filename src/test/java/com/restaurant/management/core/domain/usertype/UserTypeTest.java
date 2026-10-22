@@ -1,6 +1,7 @@
 package com.restaurant.management.core.domain.usertype;
 
 import com.restaurant.management.core.domain.exception.DomainValidationException;
+import com.restaurant.management.core.domain.user.UserProfile;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -81,5 +82,16 @@ class UserTypeTest {
         assertThat(UserType.restore(1L, "Cliente")).isNotEqualTo(UserType.restore(2L, "Cliente"));
         assertThat(UserType.create("Cliente")).isNotEqualTo(UserType.create("Cliente"));
         assertThat(UserType.restore(1L, "Cliente")).hasSameHashCodeAs(UserType.restore(2L, "Outro"));
+    }
+
+    @Test
+    @DisplayName("tipos criados pela API não são de sistema; os restaurados com perfil são, e renomear mantém o perfil")
+    void shouldTrackSystemTypes() {
+        assertThat(UserType.create("Gerente").isSystemType()).isFalse();
+        assertThat(UserType.create("Gerente").getProfile()).isNull();
+
+        UserType owner = UserType.restore(1L, "Dono de Restaurante", UserProfile.RESTAURANT_OWNER);
+        assertThat(owner.isSystemType()).isTrue();
+        assertThat(owner.rename("Proprietário").getProfile()).isEqualTo(UserProfile.RESTAURANT_OWNER);
     }
 }

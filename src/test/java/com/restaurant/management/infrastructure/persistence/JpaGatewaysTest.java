@@ -1,15 +1,13 @@
 package com.restaurant.management.infrastructure.persistence;
 
-import com.restaurant.management.core.application.exception.UserNotFoundException;
 import com.restaurant.management.core.application.pagination.PageQuery;
 import com.restaurant.management.core.application.pagination.PageResult;
 import com.restaurant.management.core.domain.menuitem.MenuItem;
 import com.restaurant.management.core.domain.restaurant.OpeningHours;
 import com.restaurant.management.core.domain.restaurant.Restaurant;
 import com.restaurant.management.core.domain.shared.Address;
+import com.restaurant.management.core.domain.user.UserProfile;
 import com.restaurant.management.core.domain.usertype.UserType;
-import com.restaurant.management.domain.model.Customer;
-import com.restaurant.management.domain.repository.UserRepository;
 import com.restaurant.management.infrastructure.persistence.menuitem.MenuItemJpaEntity;
 import com.restaurant.management.infrastructure.persistence.menuitem.MenuItemJpaGateway;
 import com.restaurant.management.infrastructure.persistence.menuitem.MenuItemJpaRepository;
@@ -17,7 +15,6 @@ import com.restaurant.management.infrastructure.persistence.restaurant.Restauran
 import com.restaurant.management.infrastructure.persistence.restaurant.RestaurantJpaGateway;
 import com.restaurant.management.infrastructure.persistence.restaurant.RestaurantJpaRepository;
 import com.restaurant.management.infrastructure.persistence.shared.AddressEmbeddable;
-import com.restaurant.management.infrastructure.persistence.user.UserJpaGateway;
 import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaEntity;
 import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaGateway;
 import com.restaurant.management.infrastructure.persistence.usertype.UserTypeJpaRepository;
@@ -39,7 +36,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -78,52 +74,11 @@ class JpaGatewaysTest {
             assertThat(gateway.findById(1L)).map(UserType::getName).contains("Cliente");
             assertThat(gateway.findAll()).extracting(UserType::getName).containsExactly("Admin");
             assertThat(gateway.findByNameIgnoreCase("cliente")).isEmpty();
+            when(repository.findByProfile(UserProfile.CUSTOMER))
+                    .thenReturn(Optional.of(new UserTypeJpaEntity(2L, "Cliente", UserProfile.CUSTOMER)));
+            assertThat(gateway.findByProfile(UserProfile.CUSTOMER)).map(UserType::isSystemType).contains(true);
             gateway.deleteById(1L);
             verify(repository).deleteById(1L);
-        }
-    }
-
-    @Nested
-    @DisplayName("UserJpaGateway")
-    class Users {
-
-        @Mock
-        private UserRepository userRepository;
-        @Mock
-        private UserTypeJpaRepository userTypeRepository;
-
-        @Test
-        @DisplayName("associa o tipo ao usuário e salva")
-        void shouldAssign() {
-            Customer customer = Customer.builder().name("Maria").build();
-            UserTypeJpaEntity type = new UserTypeJpaEntity(3L, "Cliente VIP");
-            when(userRepository.findById(10L)).thenReturn(Optional.of(customer));
-            when(userTypeRepository.getReferenceById(3L)).thenReturn(type);
-
-            new UserJpaGateway(userRepository, userTypeRepository).assignUserType(10L, 3L);
-
-            assertThat(customer.getAssignedUserType()).isSameAs(type);
-            verify(userRepository).saveAndFlush(customer);
-        }
-
-        @Test
-        @DisplayName("lança usuário não encontrado se ele sumir antes da associação")
-        void shouldThrowWhenUserIsMissing() {
-            when(userRepository.findById(10L)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> new UserJpaGateway(userRepository, userTypeRepository).assignUserType(10L, 3L))
-                    .isInstanceOf(UserNotFoundException.class);
-        }
-
-        @Test
-        @DisplayName("repassa as consultas de existência")
-        void shouldDelegateExistenceChecks() {
-            UserJpaGateway gateway = new UserJpaGateway(userRepository, userTypeRepository);
-            when(userRepository.existsById(10L)).thenReturn(true);
-            when(userRepository.existsByAssignedUserTypeId(3L)).thenReturn(true);
-
-            assertThat(gateway.existsById(10L)).isTrue();
-            assertThat(gateway.existsByUserTypeId(3L)).isTrue();
         }
     }
 

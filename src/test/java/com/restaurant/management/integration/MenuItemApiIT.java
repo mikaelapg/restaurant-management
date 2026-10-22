@@ -1,6 +1,6 @@
 package com.restaurant.management.integration;
 
-import com.restaurant.management.domain.repository.UserRepository;
+import com.restaurant.management.infrastructure.persistence.user.UserJpaRepository;
 import com.restaurant.management.infrastructure.persistence.menuitem.MenuItemJpaEntity;
 import com.restaurant.management.infrastructure.persistence.menuitem.MenuItemJpaRepository;
 import com.restaurant.management.infrastructure.persistence.restaurant.RestaurantJpaRepository;
@@ -63,7 +63,7 @@ class MenuItemApiIT {
     private RestaurantJpaRepository restaurantRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserJpaRepository userRepository;
 
     private Long cantina;
     private Long sushiBar;
