@@ -1,7 +1,7 @@
 {
  "info": {
   "name": "Sistema de Gestão de Restaurantes — API v1",
-  "description": "Coleção de testes da API de gestão de restaurantes.\n\nAs pastas estão na ordem em que devem rodar: cada uma depende do que a anterior cadastrou. Dá para rodar tudo de uma vez pelo Collection Runner ou pelo Newman.\n\nOs ids de dono e cliente são capturados dos próprios cadastros, e cada execução gera e-mails, logins, CPF e CNPJ diferentes — então a coleção pode rodar várias vezes no mesmo banco sem esbarrar nas restrições de unicidade.\n\nAntes de rodar, suba a aplicação com `docker compose up -d --build`.",
+  "description": "Coleção de testes da API de gestão de restaurantes.\n\nAs pastas estão na ordem em que devem rodar: cada uma depende do que a anterior cadastrou. Dá para rodar tudo de uma vez pelo Collection Runner ou pelo Newman.\n\nAs pastas 6 a 8 cobrem a Fase 2: tipos de usuário e a associação com os usuários, restaurantes e itens do cardápio, incluindo as regras que ligam os dois cadastros: só quem tem o tipo \"Dono de Restaurante\" pode ser dono de um restaurante, os tipos de sistema não podem ser excluídos, e um tipo de sistema não pode ser dado a um usuário de outro perfil. Elas limpam o que cadastram, para que a pasta 9 consiga excluir os usuários.\n\nOs ids de dono e cliente são capturados dos próprios cadastros, e cada execução gera e-mails, logins, CPF e CNPJ diferentes — então a coleção pode rodar várias vezes no mesmo banco sem esbarrar nas restrições de unicidade.\n\nAntes de rodar, suba a aplicação com `docker compose up -d --build`.",
   "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
  },
  "item": [
@@ -73,7 +73,7 @@
          "",
          "pm.test(\"Devolve o dono cadastrado com id\", function () {",
          "    pm.expect(owner.id).to.be.a(\"number\");",
-         "    pm.expect(owner.userType).to.eql(\"RESTAURANT_OWNER\");",
+         "    pm.expect(owner.profile).to.eql(\"RESTAURANT_OWNER\");",
          "    pm.expect(owner.email).to.eql(pm.collectionVariables.get(\"owner_email\"));",
          "    pm.expect(owner.restaurantName).to.eql(\"Restaurante do João\");",
          "});",
@@ -137,7 +137,7 @@
          "",
          "pm.test(\"Devolve o cliente cadastrado com id\", function () {",
          "    pm.expect(customer.id).to.be.a(\"number\");",
-         "    pm.expect(customer.userType).to.eql(\"CUSTOMER\");",
+         "    pm.expect(customer.profile).to.eql(\"CUSTOMER\");",
          "    pm.expect(customer.email).to.eql(pm.collectionVariables.get(\"customer_email\"));",
          "});",
          "",
@@ -327,9 +327,9 @@
          "const body = pm.response.json();",
          "",
          "pm.test(\"Identifica o usuário autenticado\", function () {",
-         "    pm.expect(body.id).to.eql(pm.collectionVariables.get(\"owner_id\"));",
+         "    pm.expect(body.id).to.eql(Number(pm.collectionVariables.get(\"owner_id\")));",
          "    pm.expect(body.login).to.eql(pm.collectionVariables.get(\"owner_login\"));",
-         "    pm.expect(body.userType).to.eql(\"RESTAURANT_OWNER\");",
+         "    pm.expect(body.profile).to.eql(\"RESTAURANT_OWNER\");",
          "});"
         ]
        }
@@ -378,7 +378,7 @@
          "});",
          "",
          "pm.test(\"Identifica o cliente\", function () {",
-         "    pm.expect(pm.response.json().userType).to.eql(\"CUSTOMER\");",
+         "    pm.expect(pm.response.json().profile).to.eql(\"CUSTOMER\");",
          "});"
         ]
        }
@@ -613,7 +613,7 @@
          "pm.test(\"Encontra o dono cadastrado neste run\", function () {",
          "    const encontrados = pm.response.json().content;",
          "    pm.expect(encontrados).to.be.an(\"array\").that.is.not.empty;",
-         "    pm.expect(encontrados.map(u => u.id)).to.include(pm.collectionVariables.get(\"owner_id\"));",
+         "    pm.expect(encontrados.map(u => u.id)).to.include(Number(pm.collectionVariables.get(\"owner_id\")));",
          "});"
         ]
        }
@@ -662,7 +662,7 @@
          "",
          "pm.test(\"Encontra o cliente cadastrado neste run\", function () {",
          "    const encontrados = pm.response.json().content;",
-         "    pm.expect(encontrados.map(u => u.id)).to.include(pm.collectionVariables.get(\"customer_id\"));",
+         "    pm.expect(encontrados.map(u => u.id)).to.include(Number(pm.collectionVariables.get(\"customer_id\")));",
          "});"
         ]
        }
@@ -702,7 +702,7 @@
          "});",
          "",
          "pm.test(\"Traz os dois tipos de usuário na mesma consulta\", function () {",
-         "    const tipos = pm.response.json().content.map(u => u.userType);",
+         "    const tipos = pm.response.json().content.map(u => u.profile);",
          "    pm.expect(tipos).to.include(\"RESTAURANT_OWNER\");",
          "    pm.expect(tipos).to.include(\"CUSTOMER\");",
          "});"
@@ -754,7 +754,7 @@
       "method": "GET",
       "header": [],
       "url": {
-       "raw": "{{base_url}}/users?page=0&size=1&sort=name,asc",
+       "raw": "{{base_url}}/users?page=0&size=1",
        "host": [
         "{{base_url}}"
        ],
@@ -769,10 +769,6 @@
         {
          "key": "size",
          "value": "1"
-        },
-        {
-         "key": "sort",
-         "value": "name,asc"
         }
        ]
       }
@@ -828,7 +824,7 @@
          "});",
          "",
          "pm.test(\"É o dono esperado\", function () {",
-         "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"owner_id\"));",
+         "    pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"owner_id\")));",
          "});"
         ]
        }
@@ -863,7 +859,7 @@
          "});",
          "",
          "pm.test(\"É o cliente esperado\", function () {",
-         "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"customer_id\"));",
+         "    pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"customer_id\")));",
          "});"
         ]
        }
@@ -1526,7 +1522,7 @@
          "});",
          "",
          "pm.test(\"A troca de senha valeu de fato\", function () {",
-         "    pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"customer_id\"));",
+         "    pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"customer_id\")));",
          "});"
         ]
        }
@@ -1536,7 +1532,1878 @@
    ]
   },
   {
-   "name": "6. Exclusão",
+   "name": "6. Tipos de usuário",
+   "description": "CRUD de tipos de usuário e associação dos usuários a um tipo. \"Dono de Restaurante\" e \"Cliente\" já vêm cadastrados pela migration, e os usuários novos nascem associados ao tipo do seu perfil.",
+   "item": [
+    {
+     "name": "Listar tipos: os dois padrões existem (200)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/user-types",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "const tipos = pm.response.json();",
+         "",
+         "pm.test(\"Tem Dono de Restaurante e Cliente\", function () {",
+         "    const nomes = tipos.map(t => t.name.toLowerCase());",
+         "    pm.expect(nomes).to.include(\"dono de restaurante\");",
+         "    pm.expect(nomes).to.include(\"cliente\");",
+         "});",
+         "",
+         "pm.test(\"Os dois padrões são tipos de sistema, ligados a um perfil\", function () {",
+         "    const sistema = tipos.filter(t => t.systemType);",
+         "    pm.expect(sistema.map(t => t.profile)).to.have.members([\"RESTAURANT_OWNER\", \"CUSTOMER\"]);",
+         "});",
+         "",
+         "pm.collectionVariables.set(\"owner_type_id\", tipos.find(t => t.profile === \"RESTAURANT_OWNER\").id);",
+         "pm.collectionVariables.set(\"customer_type_id\", tipos.find(t => t.profile === \"CUSTOMER\").id);"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Dono cadastrado já nasce com o tipo Dono de Restaurante (200)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/users/{{owner_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "{{owner_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"userType é Dono de Restaurante\", function () {",
+         "    pm.expect(pm.response.json().userType.name.toLowerCase()).to.eql(\"dono de restaurante\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastrar tipo de usuário (201)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/user-types",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Cliente VIP {{run_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 201 Created\", function () {",
+         "    pm.response.to.have.status(201);",
+         "});",
+         "",
+         "pm.test(\"Location aponta para o novo tipo\", function () {",
+         "    pm.expect(pm.response.headers.get(\"Location\")).to.match(/\\/user-types\\/\\d+$/);",
+         "});",
+         "",
+         "pm.test(\"Devolve o tipo com id\", function () {",
+         "    pm.expect(pm.response.json().id).to.be.a(\"number\");",
+         "    pm.expect(pm.response.json().name).to.eql(\"Cliente VIP \" + pm.collectionVariables.get(\"run_id\"));",
+         "});",
+         "",
+         "pm.collectionVariables.set(\"user_type_id\", pm.response.json().id);"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: nome repetido, outra capitalização (409)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/user-types",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"CLIENTE VIP {{run_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409 Conflict\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-type-conflict\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: nome vazio (400)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/user-types",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 400 Bad Request\", function () {",
+         "    pm.response.to.have.status(400);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/validation-error\");",
+         "});",
+         "",
+         "pm.test(\"Aponta os campos recusados\", function () {",
+         "    const erros = pm.response.json().fieldErrors;",
+         "    pm.expect(erros).to.have.property(\"name\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Buscar tipo por id (200)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/user-types/{{user_type_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types",
+        "{{user_type_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"É o tipo esperado\", function () {",
+         "    pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"user_type_id\")));",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Renomear tipo (200)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/user-types/{{user_type_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types",
+        "{{user_type_id}}"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Cliente Premium {{run_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Nome atualizado\", function () {",
+         "    pm.expect(pm.response.json().name).to.eql(\"Cliente Premium \" + pm.collectionVariables.get(\"run_id\"));",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Associar cliente ao novo tipo (200)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/users/{{customer_id}}/user-type",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "{{customer_id}}",
+        "user-type"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"userTypeId\": {{user_type_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"O cliente passa a ter o novo tipo\", function () {",
+         "    const usuario = pm.response.json();",
+         "    pm.expect(usuario.id).to.eql(Number(pm.collectionVariables.get(\"customer_id\")));",
+         "    pm.expect(usuario.userType.id).to.eql(Number(pm.collectionVariables.get(\"user_type_id\")));",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Exclusão recusada: tipo em uso (409)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/user-types/{{user_type_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types",
+        "{{user_type_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409 Conflict\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-type-in-use\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Associação recusada: tipo inexistente (404)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/users/{{customer_id}}/user-type",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "{{customer_id}}",
+        "user-type"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"userTypeId\": 99999999\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404 Not Found\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-type-not-found\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Associação recusada: usuário inexistente (404)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/users/99999999/user-type",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "99999999",
+        "user-type"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"userTypeId\": {{user_type_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404 Not Found\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-not-found\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Exclusão recusada: tipo de sistema (409)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/user-types/{{customer_type_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types",
+        "{{customer_type_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409 Conflict\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/system-user-type\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Associação recusada: tipo Cliente para um dono (422)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/users/{{owner_id}}/user-type",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "{{owner_id}}",
+        "user-type"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"userTypeId\": {{customer_type_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 422 Unprocessable Entity\", function () {",
+         "    pm.response.to.have.status(422);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/incompatible-user-type\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Devolver o cliente ao tipo Cliente (200)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/users/{{customer_id}}/user-type",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "{{customer_id}}",
+        "user-type"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"userTypeId\": {{customer_type_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Volta a ser Cliente\", function () {",
+         "    pm.expect(pm.response.json().userType.name.toLowerCase()).to.eql(\"cliente\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Excluir tipo que ficou sem usuários (204)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/user-types/{{user_type_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types",
+        "{{user_type_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 204 No Content\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Tipo excluído não é mais encontrado (404)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/user-types/{{user_type_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types",
+        "{{user_type_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404 Not Found\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-type-not-found\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "7. Restaurantes",
+   "description": "CRUD de restaurantes. O dono é o usuário cadastrado na pasta 1. O horário pode atravessar a meia-noite (fechamento antes da abertura).",
+   "item": [
+    {
+     "name": "Cadastrar restaurante (201)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Cantina {{run_id}}\",\n  \"address\": {\n    \"street\": \"Rua Augusta\",\n    \"number\": \"1500\",\n    \"complement\": \"Loja 2\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01305-100\"\n  },\n  \"cuisineType\": \"Italiana\",\n  \"openingHours\": {\n    \"opensAt\": \"18:00\",\n    \"closesAt\": \"02:00\"\n  },\n  \"ownerId\": {{owner_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 201 Created\", function () {",
+         "    pm.response.to.have.status(201);",
+         "});",
+         "",
+         "const restaurante = pm.response.json();",
+         "",
+         "pm.test(\"Location aponta para o novo restaurante\", function () {",
+         "    pm.expect(pm.response.headers.get(\"Location\")).to.match(/\\/restaurants\\/\\d+$/);",
+         "});",
+         "",
+         "pm.test(\"Devolve os dados cadastrados\", function () {",
+         "    pm.expect(restaurante.id).to.be.a(\"number\");",
+         "    pm.expect(restaurante.cuisineType).to.eql(\"Italiana\");",
+         "    pm.expect(restaurante.openingHours).to.eql({ opensAt: \"18:00\", closesAt: \"02:00\" });",
+         "    pm.expect(restaurante.address.city).to.eql(\"São Paulo\");",
+         "    pm.expect(restaurante.ownerId).to.eql(Number(pm.collectionVariables.get(\"owner_id\")));",
+         "});",
+         "",
+         "pm.collectionVariables.set(\"restaurant_id\", pm.response.json().id);"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: dono inexistente (404)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Sem Dono {{run_id}}\",\n  \"address\": {\n    \"street\": \"Rua Augusta\",\n    \"number\": \"1500\",\n    \"complement\": \"Loja 2\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01305-100\"\n  },\n  \"cuisineType\": \"Italiana\",\n  \"openingHours\": {\n    \"opensAt\": \"11:00\",\n    \"closesAt\": \"23:00\"\n  },\n  \"ownerId\": 99999999\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404 Not Found\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-not-found\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: cliente como dono (422)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Restaurante do Cliente {{run_id}}\",\n  \"address\": {\n    \"street\": \"Rua Augusta\",\n    \"number\": \"1500\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01305-100\"\n  },\n  \"cuisineType\": \"Italiana\",\n  \"openingHours\": {\"opensAt\": \"11:00\", \"closesAt\": \"23:00\"},\n  \"ownerId\": {{customer_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 422 Unprocessable Entity\", function () {",
+         "    pm.response.to.have.status(422);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/invalid-restaurant-owner\");",
+         "});",
+         "",
+         "pm.test(\"A mensagem diz o tipo atual do usuário\", function () {",
+         "    pm.expect(pm.response.json().detail).to.include(\"Cliente\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: campos obrigatórios ausentes (400)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"address\": {},\n  \"openingHours\": {}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 400 Bad Request\", function () {",
+         "    pm.response.to.have.status(400);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/validation-error\");",
+         "});",
+         "",
+         "pm.test(\"Aponta os campos recusados\", function () {",
+         "    const erros = pm.response.json().fieldErrors;",
+         "    pm.expect(erros).to.have.property(\"name\");",
+         "    pm.expect(erros).to.have.property(\"cuisineType\");",
+         "    pm.expect(erros).to.have.property(\"ownerId\");",
+         "    pm.expect(erros).to.have.property(\"address.street\");",
+         "    pm.expect(erros).to.have.property(\"openingHours.opensAt\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: abertura igual ao fechamento (400)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Nunca Abre {{run_id}}\",\n  \"address\": {\n    \"street\": \"Rua Augusta\",\n    \"number\": \"1500\",\n    \"complement\": \"Loja 2\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01305-100\"\n  },\n  \"cuisineType\": \"Italiana\",\n  \"openingHours\": {\n    \"opensAt\": \"10:00\",\n    \"closesAt\": \"10:00\"\n  },\n  \"ownerId\": {{owner_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 400 Bad Request\", function () {",
+         "    pm.response.to.have.status(400);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/domain-validation\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Buscar restaurante por id (200)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"É o restaurante esperado\", function () {",
+         "    pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"restaurant_id\")));",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Listar restaurantes por tipo de cozinha (200)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurants?cuisineType=italiana&name={{run_id}}&page=0&size=10",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants"
+       ],
+       "query": [
+        {
+         "key": "cuisineType",
+         "value": "italiana"
+        },
+        {
+         "key": "name",
+         "value": "{{run_id}}"
+        },
+        {
+         "key": "page",
+         "value": "0"
+        },
+        {
+         "key": "size",
+         "value": "10"
+        }
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "const pagina = pm.response.json();",
+         "",
+         "pm.test(\"Encontra o restaurante deste run\", function () {",
+         "    pm.expect(pagina.content.map(r => r.id)).to.include(Number(pm.collectionVariables.get(\"restaurant_id\")));",
+         "    pm.expect(pagina.content.every(r => r.cuisineType.toLowerCase().includes(\"italiana\"))).to.be.true;",
+         "});",
+         "",
+         "pm.test(\"Devolve os metadados de paginação\", function () {",
+         "    pm.expect(pagina).to.include.keys(\"page\", \"size\", \"totalElements\", \"totalPages\", \"last\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Atualizar restaurante (200)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Cantina da Nonna {{run_id}}\",\n  \"address\": {\n    \"street\": \"Rua Augusta\",\n    \"number\": \"1500\",\n    \"complement\": \"Loja 2\",\n    \"city\": \"São Paulo\",\n    \"state\": \"SP\",\n    \"zipCode\": \"01305-100\"\n  },\n  \"cuisineType\": \"Italiana\",\n  \"openingHours\": {\n    \"opensAt\": \"11:30\",\n    \"closesAt\": \"23:30\"\n  },\n  \"ownerId\": {{owner_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Dados atualizados\", function () {",
+         "    const restaurante = pm.response.json();",
+         "    pm.expect(restaurante.name).to.eql(\"Cantina da Nonna \" + pm.collectionVariables.get(\"run_id\"));",
+         "    pm.expect(restaurante.openingHours.opensAt).to.eql(\"11:30\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Exclusão recusada: dono ainda tem restaurante (409)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurant-owners/{{owner_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurant-owners",
+        "{{owner_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409 Conflict\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-owns-restaurants\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastrar tipo auxiliar \"Gerente\" (201)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/user-types",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Gerente {{run_id}}\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 201 Created\", function () {",
+         "    pm.response.to.have.status(201);",
+         "});",
+         "",
+         "pm.test(\"Não é tipo de sistema\", function () {",
+         "    pm.expect(pm.response.json().systemType).to.eql(false);",
+         "});",
+         "",
+         "pm.collectionVariables.set(\"aux_type_id\", pm.response.json().id);"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Troca de tipo recusada: dono com restaurante (409)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/users/{{owner_id}}/user-type",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "users",
+        "{{owner_id}}",
+        "user-type"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"userTypeId\": {{aux_type_id}}\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409 Conflict\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/user-type-change-not-allowed\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Excluir tipo auxiliar (204)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/user-types/{{aux_type_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "user-types",
+        "{{aux_type_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 204 No Content\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Restaurante inexistente (404)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurants/99999999",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "99999999"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404 Not Found\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/restaurant-not-found\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "8. Cardápio",
+   "description": "CRUD dos itens do cardápio, aninhados ao restaurante da pasta 7. Ao final, o restaurante é excluído e leva o cardápio junto.",
+   "item": [
+    {
+     "name": "Cadastrar item do cardápio (201)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Risoto de cogumelos\",\n  \"description\": \"Arroz arbóreo, funghi secchi e parmesão\",\n  \"price\": 68.9,\n  \"dineInOnly\": false,\n  \"photoPath\": \"/images/restaurants/{{restaurant_id}}/risoto.jpg\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 201 Created\", function () {",
+         "    pm.response.to.have.status(201);",
+         "});",
+         "",
+         "const prato = pm.response.json();",
+         "",
+         "pm.test(\"Location aninhado ao restaurante\", function () {",
+         "    pm.expect(pm.response.headers.get(\"Location\")).to.match(/\\/restaurants\\/\\d+\\/menu-items\\/\\d+$/);",
+         "});",
+         "",
+         "pm.test(\"Devolve o item com preço em duas casas\", function () {",
+         "    pm.expect(prato.restaurantId).to.eql(Number(pm.collectionVariables.get(\"restaurant_id\")));",
+         "    pm.expect(prato.price).to.eql(68.9);",
+         "    pm.expect(prato.dineInOnly).to.be.false;",
+         "    pm.expect(prato.photoPath).to.include(\"risoto.jpg\");",
+         "});",
+         "",
+         "pm.collectionVariables.set(\"menu_item_id\", pm.response.json().id);"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastrar item só para consumo no local (201)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Fondue para dois\",\n  \"description\": \"Queijos suíços, servido na mesa\",\n  \"price\": 149.00,\n  \"dineInOnly\": true,\n  \"photoPath\": null\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 201 Created\", function () {",
+         "    pm.response.to.have.status(201);",
+         "});",
+         "",
+         "pm.test(\"Marcado como apenas no local\", function () {",
+         "    pm.expect(pm.response.json().dineInOnly).to.be.true;",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: nome repetido no restaurante (409)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"RISOTO DE COGUMELOS\",\n  \"description\": \"Outro risoto\",\n  \"price\": 50.00,\n  \"dineInOnly\": false,\n  \"photoPath\": null\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 409 Conflict\", function () {",
+         "    pm.response.to.have.status(409);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/menu-item-conflict\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: preço inválido e campos ausentes (400)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"price\": 0\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 400 Bad Request\", function () {",
+         "    pm.response.to.have.status(400);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/validation-error\");",
+         "});",
+         "",
+         "pm.test(\"Aponta os campos recusados\", function () {",
+         "    const erros = pm.response.json().fieldErrors;",
+         "    pm.expect(erros).to.have.property(\"name\");",
+         "    pm.expect(erros).to.have.property(\"description\");",
+         "    pm.expect(erros).to.have.property(\"price\");",
+         "    pm.expect(erros).to.have.property(\"dineInOnly\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cadastro recusado: restaurante inexistente (404)",
+     "request": {
+      "method": "POST",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants/99999999/menu-items",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "99999999",
+        "menu-items"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Risoto\",\n  \"description\": \"Arroz\",\n  \"price\": 10.00,\n  \"dineInOnly\": false,\n  \"photoPath\": null\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404 Not Found\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/restaurant-not-found\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Listar o cardápio (200)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Dois itens, em ordem alfabética\", function () {",
+         "    const nomes = pm.response.json().content.map(i => i.name);",
+         "    pm.expect(nomes).to.eql([\"Fondue para dois\", \"Risoto de cogumelos\"]);",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Buscar item por id (200)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items",
+        "{{menu_item_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"É o item esperado\", function () {",
+         "    pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"menu_item_id\")));",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Atualizar item (200)",
+     "request": {
+      "method": "PUT",
+      "header": [
+       {
+        "key": "Content-Type",
+        "value": "application/json"
+       }
+      ],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items",
+        "{{menu_item_id}}"
+       ]
+      },
+      "body": {
+       "mode": "raw",
+       "raw": "{\n  \"name\": \"Risoto de cogumelos\",\n  \"description\": \"Arroz arbóreo, funghi e trufa\",\n  \"price\": 79.90,\n  \"dineInOnly\": true,\n  \"photoPath\": \"/images/restaurants/{{restaurant_id}}/risoto-trufado.jpg\"\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 200 OK\", function () {",
+         "    pm.response.to.have.status(200);",
+         "});",
+         "",
+         "pm.test(\"Dados atualizados\", function () {",
+         "    const prato = pm.response.json();",
+         "    pm.expect(prato.price).to.eql(79.9);",
+         "    pm.expect(prato.dineInOnly).to.be.true;",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Excluir item (204)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items",
+        "{{menu_item_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 204 No Content\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Item excluído não é mais encontrado (404)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items/{{menu_item_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items",
+        "{{menu_item_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404 Not Found\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/menu-item-not-found\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Excluir restaurante, com o cardápio junto (204)",
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 204 No Content\", function () {",
+         "    pm.response.to.have.status(204);",
+         "});"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "Cardápio de restaurante excluído (404)",
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{base_url}}/restaurants/{{restaurant_id}}/menu-items",
+       "host": [
+        "{{base_url}}"
+       ],
+       "path": [
+        "restaurants",
+        "{{restaurant_id}}",
+        "menu-items"
+       ]
+      }
+     },
+     "response": [],
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test(\"Status 404 Not Found\", function () {",
+         "    pm.response.to.have.status(404);",
+         "});",
+         "",
+         "pm.test(\"Erro no formato ProblemDetail\", function () {",
+         "    pm.expect(pm.response.json().type).to.eql(\"https://restaurant-api.com/errors/restaurant-not-found\");",
+         "});"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "9. Exclusão",
    "item": [
     {
      "name": "Excluir cliente (204)",
@@ -1747,6 +3614,34 @@
    "key": "customer_cpf",
    "value": "",
    "type": "string"
+  },
+  {
+   "key": "customer_type_id",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "user_type_id",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "restaurant_id",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "menu_item_id",
+   "value": "",
+   "type": "string"
+  },
+  {
+   "key": "owner_type_id",
+   "value": ""
+  },
+  {
+   "key": "aux_type_id",
+   "value": ""
   }
  ]
 }

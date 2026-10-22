@@ -1,5 +1,5 @@
 @startuml domain-model
-' Modelo de domínio — Sistema de Gestão de Restaurantes (Fase 1)
+' Modelo de domínio — Sistema de Gestão de Restaurantes (core.domain)
 ' Renderizar:  plantuml docs/domain-model.puml        (gera docs/domain-model.png)
 '   ou:        docker run --rm -v "$PWD":/work plantuml/plantuml -tpng /work/docs/domain-model.puml
 
@@ -11,49 +11,108 @@ skinparam class {
 }
 hide circle
 
-abstract class User <<abstract>> {
-  +id : Long  <<PK>>
-  +name : String
-  +email : String  <<unique>>
-  +login : String  <<unique>>
-  --
-  #password : String  (hash BCrypt)
-  +lastModifiedAt : LocalDateTime
-  +userType : UserType  <<discriminador>>
+package "core.domain.user" {
+  class User {
+    +id : Long
+    +name : String
+    +email : String  <<unique, minúsculas>>
+    +login : String  <<unique>>
+    #passwordHash : String  (BCrypt)
+    +lastModifiedAt : LocalDateTime
+    --
+    +getProfile() : UserProfile
+    +updateData(...) : User
+    +changePassword(hash) : User
+    +assignType(UserType) : User
+    +canOwnRestaurants() : boolean
+  }
+
+  interface ProfileDetails <<sealed>> {
+    +profile() : UserProfile
+  }
+
+  class CustomerDetails <<record>> {
+    +cpf : String  <<unique, opcional>>
+    +dateOfBirth : LocalDate  <<opcional>>
+  }
+
+  class RestaurantOwnerDetails <<record>> {
+    +restaurantName : String  <<opcional>>
+    +cnpj : String  <<unique, opcional>>
+  }
+
+  enum UserProfile {
+    RESTAURANT_OWNER
+    CUSTOMER
+  }
 }
 
-class Customer {
-  +cpf : String  <<unique, opcional>>
-  +dateOfBirth : LocalDate  <<opcional>>
+package "core.domain.usertype" {
+  class UserType {
+    +id : Long
+    +name : String  <<unique, sem diferenciar maiúsculas>>
+    +profile : UserProfile  <<só nos tipos de sistema>>
+    --
+    +isSystemType() : boolean
+    +rename(newName) : UserType
+  }
 }
 
-class RestaurantOwner {
-  +restaurantName : String
-  +cnpj : String  <<unique, opcional>>
+package "core.domain.restaurant / menuitem / shared" {
+  class Restaurant {
+    +id : Long
+    +name : String
+    +cuisineType : String
+    +ownerId : Long
+    --
+    +update(...) : Restaurant
+  }
+
+  class OpeningHours <<value object>> {
+    +opensAt : LocalTime
+    +closesAt : LocalTime
+    --
+    +crossesMidnight() : boolean
+    +isOpenAt(time) : boolean
+  }
+
+  class MenuItem {
+    +id : Long
+    +restaurantId : Long
+    +name : String  <<unique no restaurante>>
+    +description : String
+    +price : BigDecimal  (> 0, 2 casas)
+    +dineInOnly : boolean
+    +photoPath : String  <<opcional>>
+    --
+    +update(...) : MenuItem
+  }
+
+  class Address <<value object>> {
+    +street : String
+    +number : String
+    +complement : String
+    +city : String
+    +state : String
+    +zipCode : String
+  }
 }
 
-class Address <<value object / @Embeddable>> {
-  +street : String
-  +number : String
-  +complement : String
-  +city : String
-  +state : String
-  +zipCode : String
-}
-
-enum UserType {
-  RESTAURANT_OWNER
-  CUSTOMER
-}
-
-User <|-- Customer : herança JOINED\n(PK = FK, 1:1)
-User <|-- RestaurantOwner : herança JOINED\n(PK = FK, 1:1)
-User *-- "1" Address : composição\n(colunas da tabela users)
-User ..> UserType : discriminador
+User *-- "1" ProfileDetails : dados do perfil
+ProfileDetails <|.. CustomerDetails
+ProfileDetails <|.. RestaurantOwnerDetails
+ProfileDetails ..> UserProfile
+User *-- "0..1" Address : endereço opcional
+User "0..*" --> "0..1" UserType : tipo\n(FK, RESTRICT)
+UserType ..> UserProfile : tipos de sistema
+Restaurant "0..*" --> "1" User : dono, só com o tipo de dono\n(owner_id, RESTRICT)
+Restaurant *-- "1" Address
+Restaurant *-- "1" OpeningHours
+Restaurant "1" *-- "0..*" MenuItem : cardápio\n(CASCADE)
 
 note bottom of User
-  Tabela base: users (colunas comuns + endereço embutido).
-  Tabelas filhas: customers, restaurant_owners
-  (FK para users, ON DELETE CASCADE).
+  No banco, o perfil vira herança JOINED: users (colunas comuns,
+  endereço e user_type_id) + customers / restaurant_owners.
+  A tradução fica no UserJpaMapper, na infraestrutura.
 end note
 @enduml

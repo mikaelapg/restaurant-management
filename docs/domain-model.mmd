@@ -1,27 +1,72 @@
-%% Modelo de domínio — Sistema de Gestão de Restaurantes (Fase 1)
+%% Modelo de domínio — Sistema de Gestão de Restaurantes (core.domain)
 %% Renderizar:  mmdc -i docs/domain-model.mmd -o docs/domain-model.png
 %% ou colar em https://mermaid.live
 classDiagram
     class User {
-        <<abstract>>
         +Long id
         +String name
-        +String email  «unique»
+        +String email  «unique, minúsculas»
         +String login  «unique»
-        #String password  «hash BCrypt»
+        #String passwordHash  «BCrypt»
         +LocalDateTime lastModifiedAt
-        +UserType userType  «discriminador»
+        +getProfile() UserProfile
+        +updateData(...) User
+        +changePassword(hash) User
+        +assignType(UserType) User
+        +canOwnRestaurants() boolean
     }
-    class Customer {
+    class ProfileDetails {
+        <<sealed interface>>
+        +profile() UserProfile
+    }
+    class CustomerDetails {
+        <<record>>
         +String cpf  «unique, opcional»
-        +LocalDate dateOfBirth  «opcional»
+        +LocalDate dateOfBirth  «opcional, no passado»
     }
-    class RestaurantOwner {
-        +String restaurantName
+    class RestaurantOwnerDetails {
+        <<record>>
+        +String restaurantName  «opcional»
         +String cnpj  «unique, opcional»
     }
+    class UserProfile {
+        <<enumeration>>
+        RESTAURANT_OWNER
+        CUSTOMER
+    }
+    class UserType {
+        +Long id
+        +String name  «unique, sem diferenciar maiúsculas»
+        +UserProfile profile  «só nos tipos de sistema»
+        +isSystemType() boolean
+        +rename(newName) UserType
+    }
+    class Restaurant {
+        +Long id
+        +String name
+        +String cuisineType
+        +Long ownerId
+        +update(...) Restaurant
+    }
+    class OpeningHours {
+        <<value object>>
+        +LocalTime opensAt
+        +LocalTime closesAt
+        +crossesMidnight() boolean
+        +isOpenAt(time) boolean
+    }
+    class MenuItem {
+        +Long id
+        +Long restaurantId
+        +String name  «unique no restaurante»
+        +String description
+        +BigDecimal price  «> 0, 2 casas»
+        +boolean dineInOnly
+        +String photoPath  «opcional»
+        +update(...) MenuItem
+    }
     class Address {
-        <<value object / @Embeddable>>
+        <<value object>>
         +String street
         +String number
         +String complement
@@ -29,13 +74,15 @@ classDiagram
         +String state
         +String zipCode
     }
-    class UserType {
-        <<enumeration>>
-        RESTAURANT_OWNER
-        CUSTOMER
-    }
 
-    User <|-- Customer : JOINED (PK = FK, 1:1)
-    User <|-- RestaurantOwner : JOINED (PK = FK, 1:1)
-    User "1" *-- "1" Address : composição (colunas de users)
-    User ..> UserType : discriminador
+    User "1" *-- "1" ProfileDetails : dados do perfil
+    ProfileDetails <|.. CustomerDetails
+    ProfileDetails <|.. RestaurantOwnerDetails
+    ProfileDetails ..> UserProfile
+    User "1" *-- "0..1" Address : endereço opcional
+    User "0..*" --> "0..1" UserType : tipo (FK, RESTRICT)
+    UserType ..> UserProfile : tipos de sistema
+    Restaurant "0..*" --> "1" User : dono, só com o tipo de dono (RESTRICT)
+    Restaurant "1" *-- "1" Address
+    Restaurant "1" *-- "1" OpeningHours
+    Restaurant "1" *-- "0..*" MenuItem : cardápio (CASCADE)
