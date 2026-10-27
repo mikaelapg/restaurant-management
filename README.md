@@ -2,7 +2,10 @@
 
 [![CI](https://github.com/mikaelapg/restaurant-management/actions/workflows/ci.yml/badge.svg)](https://github.com/mikaelapg/restaurant-management/actions/workflows/ci.yml)
 
-API REST para o sistema compartilhado de gestão de restaurantes do Tech Challenge.
+API REST para o sistema compartilhado de gestão de restaurantes do Tech Challenge da
+pós-graduação em Arquitetura e Desenvolvimento Java (FIAP POSTECH).
+
+**Autora:** Mikaela Perez Guedes
 
 - **Fase 1:** cadastro e manutenção dos dois perfis de usuário, dono de restaurante e
   cliente, com validação de credenciais, busca por nome e troca de senha em endpoint dedicado.
@@ -463,7 +466,97 @@ Restrições `CHECK` impõem no banco que `opens_at <> closes_at`, que `price > 
 `user_types.profile` seja um perfil válido. `last_modified_at` é mantido pelo Hibernate via
 `@UpdateTimestamp`.
 
-O modelo de domínio está em [`docs/domain-model.mmd`](docs/domain-model.mmd) (Mermaid) e
+### Modelo de domínio
+
+```mermaid
+classDiagram
+    class User {
+        +Long id
+        +String name
+        +String email  «unique, minúsculas»
+        +String login  «unique»
+        #String passwordHash  «BCrypt»
+        +LocalDateTime lastModifiedAt
+        +getProfile() UserProfile
+        +updateData(...) User
+        +changePassword(hash) User
+        +assignType(UserType) User
+        +canOwnRestaurants() boolean
+    }
+    class ProfileDetails {
+        <<sealed interface>>
+        +profile() UserProfile
+    }
+    class CustomerDetails {
+        <<record>>
+        +String cpf  «unique, opcional»
+        +LocalDate dateOfBirth  «opcional, no passado»
+    }
+    class RestaurantOwnerDetails {
+        <<record>>
+        +String restaurantName  «opcional»
+        +String cnpj  «unique, opcional»
+    }
+    class UserProfile {
+        <<enumeration>>
+        RESTAURANT_OWNER
+        CUSTOMER
+    }
+    class UserType {
+        +Long id
+        +String name  «unique, sem diferenciar maiúsculas»
+        +UserProfile profile  «só nos tipos de sistema»
+        +isSystemType() boolean
+        +rename(newName) UserType
+    }
+    class Restaurant {
+        +Long id
+        +String name
+        +String cuisineType
+        +Long ownerId
+        +update(...) Restaurant
+    }
+    class OpeningHours {
+        <<value object>>
+        +LocalTime opensAt
+        +LocalTime closesAt
+        +crossesMidnight() boolean
+        +isOpenAt(time) boolean
+    }
+    class MenuItem {
+        +Long id
+        +Long restaurantId
+        +String name  «unique no restaurante»
+        +String description
+        +BigDecimal price  «> 0, 2 casas»
+        +boolean dineInOnly
+        +String photoPath  «opcional»
+        +update(...) MenuItem
+    }
+    class Address {
+        <<value object>>
+        +String street
+        +String number
+        +String complement
+        +String city
+        +String state
+        +String zipCode
+    }
+
+    User "1" *-- "1" ProfileDetails : dados do perfil
+    ProfileDetails <|.. CustomerDetails
+    ProfileDetails <|.. RestaurantOwnerDetails
+    ProfileDetails ..> UserProfile
+    User "1" *-- "0..1" Address : endereço opcional
+    User "0..*" --> "0..1" UserType : tipo (FK, RESTRICT)
+    UserType ..> UserProfile : tipos de sistema
+    Restaurant "0..*" --> "1" User : dono, só com o tipo de dono (RESTRICT)
+    Restaurant "1" *-- "1" Address
+    Restaurant "1" *-- "1" OpeningHours
+    Restaurant "1" *-- "0..*" MenuItem : cardápio (CASCADE)
+```
+
+Fontes do diagrama: [`docs/domain-model.mmd`](docs/domain-model.mmd) (Mermaid) e
 [`docs/domain-model.puml`](docs/domain-model.puml) (PlantUML).
 
 ## Testes
