@@ -67,3 +67,62 @@ jobs:
             target/failsafe-reports/
             target/site/jacoco/
           if-no-files-found: ignore
+
+  e2e:
+    name: Docker Compose + coleção Postman
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # O mesmo caminho do README: sobe a aplicação e o PostgreSQL com o docker-compose.yml.
+      - name: Sobe aplicação e banco com Docker Compose
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+
+      - name: Espera a API responder
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/api-docs > /dev/null; then echo "API no ar"; exit 0; fi
+            sleep 5
+          done
+          echo "::error title=API não subiu::A aplicação não respondeu em 5 minutos"
+          exit 1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      # Roda a coleção inteira, na ordem das pastas, contra a API em Docker.
+      - name: Roda a coleção Postman com Newman
+        run: |
+          npx -y newman@6 run postman/restaurant-management.postman_collection.json \
+            --reporters cli,json --reporter-json-export newman.json
+
+      - name: Resumo do Newman
+        if: always()
+        run: |
+          if [ -f newman.json ]; then
+            python3 - <<'PY'
+          import json
+          run = json.load(open("newman.json"))["run"]
+          s = run["stats"]
+          print(f"::notice title=Postman::{s['requests']['total']} requisições, "
+                f"{s['assertions']['total']} asserções, {s['assertions']['failed']} falhas")
+          for f in run["failures"][:30]:
+              name = f.get("source", {}).get("name", "?")
+              msg = f.get("error", {}).get("message", "").replace("\n", " ")
+              print(f"::error title=Postman: {name}::{msg}")
+          PY
+          fi
+
+      - name: Logs da aplicação
+        if: failure()
+        run: |
+          docker compose logs app | grep -E 'ERROR|Exception|Caused by' | head -40 \
+            | while read -r line; do echo "::error title=Log da aplicação::${line}"; done
+
+      - name: Derruba os containers
+        if: always()
+        run: docker compose down -v
