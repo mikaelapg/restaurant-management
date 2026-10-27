@@ -64,9 +64,8 @@ public class OpenApiConfig {
                         .license(new License()
                                 .name("MIT License")
                                 .url("https://opensource.org/licenses/MIT")))
-                .servers(List.of(
-                        new Server().url("http://localhost:8080").description("Ambiente Local"),
-                        new Server().url("http://restaurant-app:8080").description("Ambiente Docker")
-                ));
+                // URL relativa: o "Try it out" chama o mesmo endereço em que o Swagger foi aberto,
+                // seja localhost, o container do Docker Compose ou um ambiente na nuvem.
+                .servers(List.of(new Server().url("/").description("Servidor atual")));
     }
 }

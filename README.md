@@ -218,6 +218,19 @@ docker compose up -d db
 .\mvnw.cmd spring-boot:run # Windows
 ```
 
+### No navegador, com GitHub Codespaces
+
+Sem instalar nada: no GitHub, **Code → Codespaces → Create codespace on main**. O ambiente
+abre com Docker, Java 21 e Newman, configurados em `.devcontainer/devcontainer.json`. No
+terminal:
+
+```bash
+docker compose up -d --build
+newman run postman/restaurant-management.postman_collection.json
+```
+
+A aba **Ports** mostra a porta 8080; abra o endereço dela com `/swagger-ui.html` no fim.
+
 ### Variáveis de ambiente
 
 | Variável | Padrão | Uso |

@@ -79,5 +79,6 @@ class ConfigTest {
 
         assertThat(openApi.getInfo().getTitle()).contains("Restaurantes");
         assertThat(openApi.getComponents().getSchemas()).containsKey("ProblemDetail");
+        assertThat(openApi.getServers()).singleElement().extracting(server -> server.getUrl()).isEqualTo("/");
     }
 }
