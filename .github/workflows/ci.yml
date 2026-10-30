@@ -54,6 +54,10 @@ jobs:
               tests=$(cat target/$kind-reports/TEST-*.xml | grep -o '<testsuite [^>]*' | grep -o ' tests="[0-9]*"' | grep -o '[0-9]*' | paste -sd+ | bc)
               skipped=$(cat target/$kind-reports/TEST-*.xml | grep -o '<testsuite [^>]*' | grep -o ' skipped="[0-9]*"' | grep -o '[0-9]*' | paste -sd+ | bc)
               echo "::notice title=Testes ($kind)::${tests} testes, ${skipped} ignorados"
+              if [ "$kind" = failsafe ] && [ "${skipped:-0}" -gt 0 ]; then
+                echo "::error title=Testes de integração ignorados::${skipped} testes de integração foram ignorados (Docker indisponível para o Testcontainers)"
+                exit 1
+              fi
             fi
           done
 
