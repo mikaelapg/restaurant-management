@@ -5,8 +5,6 @@
 API REST para o sistema compartilhado de gestão de restaurantes do Tech Challenge da
 pós-graduação em Arquitetura e Desenvolvimento Java (FIAP POSTECH).
 
-**Autora:** Mikaela Perez Guedes
-
 - **Fase 1:** cadastro e manutenção dos dois perfis de usuário, dono de restaurante e
   cliente, com validação de credenciais, busca por nome e troca de senha em endpoint dedicado.
 - **Fase 2:** cadastro de tipos de usuário e associação dos usuários a um tipo, cadastro de
@@ -15,12 +13,6 @@ pós-graduação em Arquitetura e Desenvolvimento Java (FIAP POSTECH).
 
 Construída em Java 21 e Spring Boot 3.3, com persistência em PostgreSQL versionada por
 Flyway e empacotamento em Docker.
-
-**Repositório:** <https://github.com/mikaelapg/restaurant-management>
-O repositório contém o código-fonte, este README, a documentação Swagger/OpenAPI (servida
-pela aplicação) e a coleção Postman em JSON.
-
-**Vídeo de apresentação:** _link a incluir_
 
 ## Stack
 
